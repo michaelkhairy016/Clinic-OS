@@ -1,0 +1,6 @@
+# Netlify detects Next.js and uses the built-in Next.js runtime (no legacy plugin needed).
+# Add env vars in Netlify: Site settings → Environment variables:
+#   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
+
+[build]
+  command = "npm run build"
