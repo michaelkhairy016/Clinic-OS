@@ -2,9 +2,8 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Clock, Play, CheckCircle, Smartphone, UserPlus, CreditCard, 
-  Edit, History as HistoryIcon, DollarSign, Plus, AlertCircle, 
-  X, Search, Loader2 
+  Clock, CheckCircle, UserPlus, 
+  Plus, X, Search 
 } from 'lucide-react';
 import { useAuth } from '@/modules/auth/AuthContext';
 import { createClient } from '@/lib/supabase/client';
@@ -13,7 +12,7 @@ import type { PatientRow, QueueEntryRow } from '@/types/database';
 type QueueRow = QueueEntryRow & { patients: PatientRow | null };
 
 export default function QueuePage() {
-  const { role, activeClinicId } = useAuth();
+  const { activeClinicId } = useAuth();
   
   // Dynamic Config Data
   const [vTypes, setVTypes] = useState<any[]>([]);
@@ -22,7 +21,6 @@ export default function QueuePage() {
 
   const [patients, setPatients] = useState<PatientRow[]>([]);
   const [queue, setQueue] = useState<QueueRow[]>([]);
-  const [loading, setLoading] = useState(true);
   
   // Modal States
   const [showCheckInModal, setShowCheckInModal] = useState(false);
@@ -72,7 +70,6 @@ export default function QueuePage() {
     ]);
     setPatients(pRes.data || []);
     setQueue((qRes.data as QueueRow[]) || []);
-    setLoading(false);
   }, [activeClinicId, supabase]);
 
   useEffect(() => {

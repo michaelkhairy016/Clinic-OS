@@ -23,6 +23,7 @@ export type PatientRow = {
   is_first_psych_visit: boolean;
   previous_doctor: string | null;
   referral_source_id: string | null;
+  is_vezeeta: boolean;
 };
 
 export type QueueStatus = 'waiting' | 'active' | 'done';
@@ -34,12 +35,13 @@ export interface QueueEntryRow {
   clinic_id: string;
   status: 'waiting' | 'active' | 'done';
   queue_num: number;
-  visit_type: string;
-  payment_mode: 'cash' | 'instapay' | 'card';
+  visit_type_id: string | null;
+  payment_method_id: string | null;
   amount_paid: number;
   discount: number;
+  is_vezeeta: boolean;
   check_in_time: string;
-};
+}
 
 export type QueueWithPatient = QueueEntryRow & {
   patients: PatientRow | null;

@@ -12,7 +12,7 @@ import { isSupabaseConfigured } from '@/lib/supabase/client';
 import ClinicSelectorOverlay from '@/modules/admin-clinics/ClinicSelectorOverlay';
 
 const AppShell = ({ children }: { children: React.ReactNode }) => {
-  const { user, role, approvalStatus, logout, language, loading, activeClinicId } = useAuth();
+  const { user, role, approvalStatus, logout, language, loading } = useAuth();
   const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
 
@@ -91,7 +91,7 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
       <div className="main-wrapper">
         <header className="top-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 2rem', background: 'white', borderBottom: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-             <h1 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--primary)' }}>Psychiatry EMR - Dr. Amgad</h1>
+             <h1 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--primary)' }}>Dr. Amgad Khairy Kamel Clinics</h1>
              <span className="badge badge-active">{role === 'doctor' ? 'Online' : 'Assistant'}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>

@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  Plus, Search, User, FileText, Printer, Save, History, 
-  Trash2, Edit2, CheckCircle, Clock, ChevronRight, AlertCircle, ArrowLeft, Pill 
+  Plus, User, FileText, Printer, Save, History, 
+  Trash2, AlertCircle, ArrowLeft, Pill 
 } from 'lucide-react';
 import { useAuth } from '@/modules/auth/AuthContext';
 import { createClient } from '@/lib/supabase/client';
@@ -11,7 +11,7 @@ import { PatientRow } from '@/types/database';
 import { generateRxPDF } from '@/modules/clinical/utils/generateRxPDF';
 
 export default function ClinicalPage() {
-  const [activePatient, setActivePatient] = useState<PatientRow | null>(null);
+  const [activePatient] = useState<PatientRow | null>(null);
   const [visitType, setVisitType] = useState('Consultation');
   const [diagnosis, setDiagnosis] = useState('');
   const [notes, setNotes] = useState('');

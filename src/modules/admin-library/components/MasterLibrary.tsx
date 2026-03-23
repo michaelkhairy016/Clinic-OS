@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Edit2, Trash2, Plus, Loader2, X, Check } from 'lucide-react';
+import { Trash2, Plus, Loader2, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 type Medication = {

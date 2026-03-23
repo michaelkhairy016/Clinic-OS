@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Globe, Send, User, Building2, Briefcase, Pill, Loader2, CheckCircle2, ChevronDown } from 'lucide-react';
+import { Globe, Send, Building2, Loader2, CheckCircle2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 export default function MRIntakeForm() {
@@ -90,7 +90,7 @@ export default function MRIntakeForm() {
     <div dir={lang === 'ar' ? 'rtl' : 'ltr'} style={{ minHeight: '100vh', background: '#f5f8f8', padding: '2rem' }}>
       <div style={{ maxWidth: '600px', margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-          <h1 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--primary)', fontWeight: 800 }}>Clinic-OS Support</h1>
+          <h1 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--primary)', fontWeight: 800 }}>Dr. Amgad Khairy Kamel Clinics</h1>
           <button onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')} className="btn btn-secondary">
              <Globe size={18} /> {lang === 'ar' ? 'English' : 'عربي'}
           </button>

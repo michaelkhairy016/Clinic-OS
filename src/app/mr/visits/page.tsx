@@ -1,18 +1,16 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/modules/auth/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import { 
-  Building2, Briefcase, Pill, Clock, 
-  PlusCircle, Filter, X, Save, 
-  MapPin, Loader2 
+  PlusCircle, X, Save, 
+  Loader2 
 } from 'lucide-react';
 
 export default function MRVisitsPage() {
   const { role } = useAuth();
   const [visits, setVisits] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   
   // New Med Form State
@@ -23,19 +21,17 @@ export default function MRVisitsPage() {
 
   const supabase = createClient();
 
-  const fetchVisits = async () => {
-    setLoading(true);
+  const fetchVisits = useCallback(async () => {
     const { data } = await supabase
       .from('mr_visits')
       .select('*, pharma_companies(name_ar, name_en), medical_lines(name_ar, name_en)')
       .order('created_at', { ascending: false });
     setVisits(data || []);
-    setLoading(false);
-  };
+  }, [supabase]);
 
   useEffect(() => {
     fetchVisits();
-  }, [supabase]);
+  }, [fetchVisits]);
 
   const handleAddMed = async () => {
     setAddingMed(true);

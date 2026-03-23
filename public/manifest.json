@@ -1,7 +1,7 @@
 {
-  "name": "Clinic-OS",
+  "name": "Dr. Amgad Khairy Kamel Clinics",
   "short_name": "Clinic-OS",
-  "description": "Psychiatry EMR & Clinic Management System",
+  "description": "Psychiatry EMR & Clinic Management System by Dr. Amgad",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

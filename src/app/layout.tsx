@@ -6,8 +6,8 @@ import { ClientLayout } from '@/modules/core/ClientLayout';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Clinic-OS',
-  description: 'Psychiatry EMR & Clinic Management System',
+  title: 'Dr. Amgad Khairy Kamel Clinics',
+  description: 'Psychiatry EMR & Clinic Management System by Dr. Amgad',
   manifest: '/manifest.json',
 };
 

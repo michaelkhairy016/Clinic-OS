@@ -4,14 +4,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/modules/auth/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import { 
-  Settings, MapPin, CreditCard, Stethoscope, 
-  Plus, Save, Trash2, Globe, Building2 
+  CreditCard, Stethoscope, 
+  Plus, Save, Trash2, Building2 
 } from 'lucide-react';
 
 export default function SettingsPage() {
   const { role } = useAuth();
   const [activeTab, setActiveTab] = useState<'clinics' | 'visits' | 'payments' | 'masters'>('clinics');
-  const [loading, setLoading] = useState(false);
   
   const [clinics, setClinics] = useState<any[]>([]);
   const [visitTypes, setVisitTypes] = useState<any[]>([]);
@@ -20,7 +19,6 @@ export default function SettingsPage() {
   const supabase = createClient();
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
     const [cRes, vRes, pRes] = await Promise.all([
       supabase.from('clinics').select('*').order('name_ar'),
       supabase.from('visit_types').select('*').order('name_ar'),
@@ -29,7 +27,6 @@ export default function SettingsPage() {
     setClinics(cRes.data || []);
     setVisitTypes(vRes.data || []);
     setPayments(pRes.data || []);
-    setLoading(false);
   }, [supabase]);
 
   useEffect(() => {

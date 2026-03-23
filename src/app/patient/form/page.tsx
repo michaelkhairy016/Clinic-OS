@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Globe, Send, User, MapPin, Briefcase, Pill, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import { Globe, Send, MapPin, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 export default function PatientForm() {
