@@ -68,19 +68,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     let cancelled = false;
 
     const init = async () => {
-      const {
-        data: { user: u },
-      } = await supabase.auth.getUser();
-      if (!cancelled) await refreshProfile(u);
-      if (!cancelled) setLoading(false);
+      try {
+        const {
+          data: { user: u },
+        } = await supabase.auth.getUser();
+        if (!cancelled) await refreshProfile(u);
+      } catch (err) {
+        console.error('Auth initialization failed:', err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     };
     void init();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      await refreshProfile(session?.user ?? null);
-      setLoading(false);
+      try {
+        await refreshProfile(session?.user ?? null);
+      } catch (err) {
+        console.error('Profile refresh failed:', err);
+      } finally {
+        setLoading(false);
+      }
     });
 
     return () => {
