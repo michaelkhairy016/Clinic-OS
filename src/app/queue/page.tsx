@@ -89,7 +89,7 @@ export default function QueuePage() {
   const handleSearch = (val: string) => {
     setSearchName(val);
     if (val.length > 2) {
-      setFoundPatients(patients.filter((p) => p.name.toLowerCase().includes(val.toLowerCase())));
+      setFoundPatients(patients.filter((p) => p.full_name.toLowerCase().includes(val.toLowerCase())));
     } else {
       setFoundPatients([]);
     }
@@ -99,10 +99,10 @@ export default function QueuePage() {
     const p = patients.find((x) => x.id === patientId);
     if (!p) return;
     setSelectedPatientId(patientId);
-    setEditName(p.name);
+    setEditName(p.full_name);
     setEditAge(p.age ?? 0);
     setEditPhone(p.phone ?? '');
-    setEditHistory(p.history ?? '');
+    setEditHistory(p.chronic_history ?? '');
     setShowEditModal(true);
   };
 
@@ -126,15 +126,15 @@ export default function QueuePage() {
       patient = patients.find((p) => p.id === pId) ?? null;
     } else {
       const { count } = await supabase.from('patients').select('*', { count: 'exact', head: true });
-      const code = `PT-${1000 + (count ?? 0) + 1}`;
+      const patientCode = `PT-${1000 + (count ?? 0) + 1}`;
       const { data, error } = await supabase
         .from('patients')
         .insert({
-          code,
-          name: searchName.trim(),
+          patient_code: patientCode,
+          full_name: searchName.trim(),
           age: 0,
           phone: '',
-          history: '',
+          chronic_history: '',
         })
         .select()
         .single();
@@ -188,10 +188,10 @@ export default function QueuePage() {
     const { error } = await supabase
       .from('patients')
       .update({
-        name: editName,
+        full_name: editName,
         age: editAge,
         phone: editPhone,
-        history: editHistory,
+        chronic_history: editHistory,
       })
       .eq('id', selectedPatientId);
     if (error) {
@@ -253,7 +253,7 @@ export default function QueuePage() {
         {queue.map((visit) => (
           <div key={visit.id} className="card" style={{ marginBottom: 0, padding: '1.5rem', position: 'relative' }}>
             <div style={{ position: 'absolute', top: '1rem', left: '1rem', opacity: 0.5, fontWeight: 'bold', fontSize: '0.8rem' }}>
-              {visit.patients?.code ?? visit.patient_id}
+              {visit.patients?.patient_code ?? visit.patient_id}
             </div>
             <div className="flex-between" style={{ marginBottom: '1rem' }}>
               <span style={{ fontSize: '1.2rem', fontWeight: 800 }}>دور رقم #{visit.queue_num}</span>
@@ -283,7 +283,7 @@ export default function QueuePage() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <h4 style={{ margin: 0 }}>{visit.patients?.name ?? '—'}</h4>
+              <h4 style={{ margin: 0 }}>{visit.patients?.full_name ?? '—'}</h4>
               {visit.status === 'waiting' && (
                 <span className="badge badge-waiting">{isDoc ? 'Waiting' : 'في الانتظار'}</span>
               )}
@@ -417,9 +417,9 @@ export default function QueuePage() {
                         }}
                       >
                         <div>
-                          <div style={{ fontWeight: 'bold' }}>{p.name}</div>
+                          <div style={{ fontWeight: 'bold' }}>{p.full_name}</div>
                           <div style={{ fontSize: '0.8rem', color: 'var(--text-medium)' }}>
-                            Code: {p.code} | Age: {p.age}
+                            Code: {p.patient_code} | Age: {p.age}
                           </div>
                         </div>
                         <span className="badge badge-active" style={{ fontSize: '0.7rem' }}>
@@ -480,7 +480,7 @@ export default function QueuePage() {
                 onClick={() => void handleCheckIn()}
                 disabled={!searchName.trim()}
               >
-                {searchName.length > 0 && !foundPatients.some((p) => p.name === searchName)
+                {searchName.length > 0 && !foundPatients.some((p) => p.full_name === searchName)
                   ? 'تسجيل كمريض جديد'
                   : 'تأكيد الحجز'}
               </button>
@@ -503,7 +503,7 @@ export default function QueuePage() {
         >
           <div className="card" style={{ width: '600px', maxWidth: '90vw' }}>
             <h3 style={{ margin: '0 0 1.5rem 0', color: 'var(--primary)' }}>
-              تعديل بيانات المريض ({patients.find((p) => p.id === selectedPatientId)?.code})
+              تعديل بيانات المريض ({patients.find((p) => p.id === selectedPatientId)?.patient_code})
             </h3>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
@@ -571,7 +571,7 @@ export default function QueuePage() {
         >
           <div className="card" style={{ width: '600px', maxWidth: '90vw' }}>
             <h3 style={{ margin: '0 0 1.5rem 0', color: 'var(--primary)' }}>
-              سجل التغييرات (Audit Log) - {patients.find((p) => p.id === selectedPatientId)?.name}
+              سجل التغييرات (Audit Log) - {patients.find((p) => p.id === selectedPatientId)?.full_name}
             </h3>
 
             <div style={{ maxHeight: '400px', overflowY: 'auto' }}>

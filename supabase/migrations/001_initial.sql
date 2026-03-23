@@ -27,11 +27,11 @@ create policy "profiles_update_own"
 create table if not exists public.patients (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz default now(),
-  code text unique not null,
-  name text not null,
+  patient_code text unique not null,
+  full_name text not null,
   age int default 0,
   phone text default '',
-  history text default '',
+  chronic_history text default '',
   referral_source text default ''
 );
 

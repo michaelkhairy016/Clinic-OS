@@ -123,7 +123,7 @@ export default function ClinicalPage() {
               {patientLoading
                 ? 'Loading patient…'
                 : activePatient
-                  ? `Active Patient: ${activePatient.name} (${activePatient.code})`
+                  ? `Active Patient: ${activePatient.full_name} (${activePatient.patient_code})`
                   : 'No active patient — call someone from Live Queue'}
             </span>
          </div>

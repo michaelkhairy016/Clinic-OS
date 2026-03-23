@@ -14,11 +14,11 @@ export type ProfileRow = {
 export type PatientRow = {
   id: string;
   created_at: string;
-  code: string;
-  name: string;
+  patient_code: string;
+  full_name: string;
   age: number | null;
   phone: string | null;
-  history: string | null;
+  chronic_history: string | null;
   referral_source: string | null;
 };
 

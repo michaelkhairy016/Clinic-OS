@@ -19,7 +19,28 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
     setMounted(true);
   }, []);
 
-  if (!mounted) return <div style={{ minHeight: '100vh', background: 'var(--bg-color)' }} />;
+  if (!mounted || loading) {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        background: 'var(--bg-color)', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        color: 'var(--primary)',
+        fontWeight: 'bold',
+        fontSize: '1.1rem'
+      }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+          <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid #fff', borderTop: '4px solid var(--primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+          <span>جاري التحميل... (Loading Clinic-OS)</span>
+        </div>
+        <style>{`
+          @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        `}</style>
+      </div>
+    );
+  }
 
   if (!isSupabaseConfigured()) {
     return <SetupSupabase />;
@@ -30,10 +51,6 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
 
   if (isPublicPath) {
     return <main>{children}</main>;
-  }
-
-  if (loading) {
-    return <div style={{ minHeight: '100vh', background: 'var(--bg-color)' }} />;
   }
 
   if (!user) {

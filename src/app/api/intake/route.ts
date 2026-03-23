@@ -40,16 +40,16 @@ export async function POST(req: Request) {
 
   const { count } = await supabase.from('patients').select('*', { count: 'exact', head: true });
   const nextIndex = (count ?? 0) + 1;
-  const code = `PT-${1000 + nextIndex}`;
+  const patientCode = `PT-${1000 + nextIndex}`;
 
   const { data: patient, error: pErr } = await supabase
     .from('patients')
     .insert({
-      code,
-      name,
+      patient_code: patientCode,
+      full_name: name,
       age,
       phone,
-      history,
+      chronic_history: history,
       referral_source: referralSource || null,
     })
     .select()
