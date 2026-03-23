@@ -23,6 +23,8 @@ interface AuthState {
   logout: () => Promise<void>;
   loading: boolean;
   language: 'en' | 'ar';
+  activeClinicId: string | null;
+  setActiveClinicId: (id: string | null) => void;
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
@@ -33,6 +35,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [approvalStatus, setApprovalStatus] = useState<ApprovalStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [language, setLanguage] = useState<'en' | 'ar'>('ar');
+  const [activeClinicId, setActiveClinicIdState] = useState<string | null>(null);
+
+  const setActiveClinicId = (id: string | null) => {
+    setActiveClinicIdState(id);
+    if (typeof window !== 'undefined') {
+      if (id) localStorage.setItem('clinic_os_active_clinic', id);
+      else localStorage.removeItem('clinic_os_active_clinic');
+    }
+  };
 
   const refreshProfile = useCallback(async (sessionUser: User | null) => {
     if (!sessionUser) {
@@ -77,6 +88,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.error('Auth initialization failed:', err);
       } finally {
         if (!cancelled) setLoading(false);
+      }
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('clinic_os_active_clinic');
+        if (saved) setActiveClinicIdState(saved);
       }
     };
     void init();
@@ -169,7 +184,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, role, approvalStatus, login, signup, logout, loading, language }}
+      value={{ 
+        user, role, approvalStatus, login, signup, logout, 
+        loading, language, activeClinicId, setActiveClinicId 
+      }}
     >
       {children}
     </AuthContext.Provider>

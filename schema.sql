@@ -30,6 +30,9 @@ CREATE TABLE patients (
   phone TEXT,
   age INTEGER,
   chronic_history TEXT,
+  living_district TEXT,
+  is_first_psych_visit BOOLEAN,
+  referral_source TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

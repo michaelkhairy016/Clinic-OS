@@ -19,19 +19,25 @@ export type PatientRow = {
   age: number | null;
   phone: string | null;
   chronic_history: string | null;
-  referral_source: string | null;
+  district_id: string | null;
+  is_first_psych_visit: boolean;
+  previous_doctor: string | null;
+  referral_source_id: string | null;
 };
 
 export type QueueStatus = 'waiting' | 'active' | 'done';
 
-export type QueueEntryRow = {
+export interface QueueEntryRow {
   id: string;
   created_at: string;
   patient_id: string;
-  status: QueueStatus;
+  clinic_id: string;
+  status: 'waiting' | 'active' | 'done';
   queue_num: number;
   visit_type: string;
-  payment: string;
+  payment_mode: 'cash' | 'instapay' | 'card';
+  amount_paid: number;
+  discount: number;
   check_in_time: string;
 };
 

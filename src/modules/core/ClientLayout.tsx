@@ -2,16 +2,17 @@
 
 import React, { useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from '@/modules/auth/AuthContext';
-import { Sidebar } from '@/modules/core/Sidebar';
-import { LogOut } from 'lucide-react';
+import { Sidebar } from './Sidebar';
 import { usePathname } from 'next/navigation';
+import { LogOut } from 'lucide-react';
 
 import { LoginScreen } from '@/modules/auth/LoginScreen';
 import { SetupSupabase } from '@/modules/auth/SetupSupabase';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
+import ClinicSelectorOverlay from '@/modules/admin-clinics/ClinicSelectorOverlay';
 
 const AppShell = ({ children }: { children: React.ReactNode }) => {
-  const { user, role, approvalStatus, logout, language, loading } = useAuth();
+  const { user, role, approvalStatus, logout, language, loading, activeClinicId } = useAuth();
   const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
 
@@ -21,11 +22,11 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
 
   if (!mounted || loading) {
     return (
-      <div style={{ 
-        minHeight: '100vh', 
-        background: 'var(--bg-color)', 
-        display: 'flex', 
-        alignItems: 'center', 
+      <div style={{
+        minHeight: '100vh',
+        background: 'var(--bg-color)',
+        display: 'flex',
+        alignItems: 'center',
         justifyContent: 'center',
         color: 'var(--primary)',
         fontWeight: 'bold',
@@ -33,7 +34,7 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
       }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
           <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid #fff', borderTop: '4px solid var(--primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-          <span>جاري التحميل... (Loading Clinic-OS)</span>
+          <span>جاري التحميل... (Loading Clinic-OS by Amgad)</span>
         </div>
         <style>{`
           @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -46,8 +47,7 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
     return <SetupSupabase />;
   }
 
-  const isPublicPath =
-    pathname.startsWith('/patient/form') || pathname.startsWith('/auth/signup');
+  const isPublicPath = pathname.startsWith('/patient/form') || pathname.startsWith('/auth/signup');
 
   if (isPublicPath) {
     return <main>{children}</main>;
@@ -59,25 +59,11 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
 
   if (!role) {
     return (
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'var(--bg-color)',
-          padding: '2rem',
-        }}
-      >
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-color)', padding: '2rem' }}>
         <div className="card" style={{ maxWidth: 480, textAlign: 'center' }}>
           <h2 style={{ color: 'var(--primary)', marginTop: 0 }}>Account not linked</h2>
-          <p style={{ color: 'var(--text-medium)' }}>
-            No clinic profile was found. If you just signed up as staff, wait for a doctor to approve your account, or
-            contact the clinic.
-          </p>
-          <button type="button" className="btn btn-primary" style={{ marginTop: '1rem' }} onClick={() => logout()}>
-            Sign out
-          </button>
+          <p style={{ color: 'var(--text-medium)' }}>No clinic profile was found. Please contact Dr. Amgad to approve your access.</p>
+          <button type="button" className="btn btn-primary" style={{ marginTop: '1rem' }} onClick={() => logout()}>Sign out</button>
         </div>
       </div>
     );
@@ -85,29 +71,13 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
 
   if (approvalStatus === 'pending') {
     return (
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'var(--bg-color)',
-          padding: '2rem',
-        }}
-        dir="rtl"
-      >
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-color)', padding: '2rem' }} dir="rtl">
         <div className="card" style={{ maxWidth: 520, textAlign: 'center' }}>
           <h2 style={{ color: 'var(--primary)', marginTop: 0 }}>بانتظار الموافقة</h2>
           <p style={{ color: 'var(--text-medium)', lineHeight: 1.7 }}>
-            تم إنشاء حسابك كـ <strong>{role === 'marketing' ? 'تسويق' : 'مساعد'}</strong>. سيقوم الطبيب بمراجعة طلبك
-            وتفعيل الدخول قريباً.
+            تم إنشاء حسابك كـ <strong>{role === 'marketing' ? 'تسويق' : 'مساعد'}</strong>. سيقوم د. أمجد بمراجعة طلبك وتفعيل الدخول قريباً.
           </p>
-          <p style={{ color: 'var(--text-light)', fontSize: '0.9rem' }}>
-            Awaiting approval. Your doctor will activate your access soon.
-          </p>
-          <button type="button" className="btn btn-primary" style={{ marginTop: '1rem' }} onClick={() => logout()}>
-            تسجيل الخروج / Sign out
-          </button>
+          <button type="button" className="btn btn-primary" style={{ marginTop: '1rem' }} onClick={() => logout()}>تسجيل الخروج / Sign out</button>
         </div>
       </div>
     );
@@ -119,26 +89,24 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
     <div className={`app-container ${isRTL ? 'dir-rtl' : 'dir-ltr'}`}>
       <Sidebar />
       <div className="main-wrapper">
-        <header className="top-header">
-          <h1 className="page-title">
-            {role === 'doctor' ? 'Clinic-OS Psychiatry EMR' : 'عيادة د. أمجد خيري كامل'}
-          </h1>
+        <header className="top-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 2rem', background: 'white', borderBottom: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <span className="badge badge-active">{role === 'doctor' ? 'Online' : 'متصل'}</span>
-            <span style={{ fontWeight: 600, textTransform: 'capitalize' }}>
-              {role === 'doctor'
-                ? 'Dr. Amjad'
-                : role === 'assistant'
-                  ? 'مساعد التمريض'
-                  : 'التسويق'}
-            </span>
-            <button type="button" className="btn btn-ghost" onClick={() => logout()} style={{ padding: '8px' }}>
-              <LogOut size={18} />
+             <h1 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--primary)' }}>Psychiatry EMR - Dr. Amgad</h1>
+             <span className="badge badge-active">{role === 'doctor' ? 'Online' : 'Assistant'}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <button type="button" className="btn btn-ghost" onClick={() => logout()} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <LogOut size={18} /> {isRTL ? 'خروج' : 'Logout'}
             </button>
           </div>
         </header>
-        <main className="main-content">{children}</main>
+        <main className="main-content" style={{ padding: '2rem' }}>
+          <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+            {children}
+          </div>
+        </main>
       </div>
+      <ClinicSelectorOverlay />
     </div>
   );
 };

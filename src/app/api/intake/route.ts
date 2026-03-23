@@ -1,90 +1,58 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-function getAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return null;
-  return createClient(url, key);
-}
+import { getAdmin } from '@/lib/supabase/admin';
 
 export async function POST(req: Request) {
   const supabase = getAdmin();
   if (!supabase) {
-    return NextResponse.json({ error: 'Intake API not configured (missing service role key)' }, { status: 503 });
+    return NextResponse.json({ error: 'Supabase admin client not initialized' }, { status: 500 });
   }
-
-  let body: {
-    name?: string;
-    age?: number;
-    phone?: string;
-    history?: string;
-    referralSource?: string;
-  };
 
   try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+    const body = await req.json();
+    const { 
+      name, age, phone, districtId, 
+      isFirstVisit, previousDoctor, previousMedIds, 
+      history, referralSourceId 
+    } = body;
 
-  const name = String(body.name ?? '').trim();
-  if (!name) {
-    return NextResponse.json({ error: 'Name is required' }, { status: 400 });
-  }
+    // 1. Create Patient Record
+    const patientCode = `P-${Math.floor(10000 + Math.random() * 90000)}`;
+    const { data: patient, error: pErr } = await supabase
+      .from('patients')
+      .insert({
+        patient_code: patientCode,
+        full_name: name,
+        age: age || 0,
+        phone: phone || '',
+        chronic_history: history || '',
+        district_id: districtId || null,
+        is_first_psych_visit: isFirstVisit === true,
+        previous_doctor: previousDoctor || '',
+        referral_source_id: referralSourceId || null
+      })
+      .select()
+      .single();
 
-  const age = Number.isFinite(body.age) ? Math.max(0, Math.floor(Number(body.age))) : 0;
-  const phone = String(body.phone ?? '').trim();
-  const history = String(body.history ?? '').trim();
-  const referralSource = String(body.referralSource ?? '').trim();
+    if (pErr) throw pErr;
 
-  const { count } = await supabase.from('patients').select('*', { count: 'exact', head: true });
-  const nextIndex = (count ?? 0) + 1;
-  const patientCode = `PT-${1000 + nextIndex}`;
+    // 2. Insert Previous Meds (Relational)
+    if (previousMedIds && previousMedIds.length > 0) {
+      const medHistory = previousMedIds.map((mId: string) => ({
+        patient_id: patient.id,
+        medication_id: mId
+      }));
+      await supabase.from('patient_previous_meds').insert(medHistory);
+    }
 
-  const { data: patient, error: pErr } = await supabase
-    .from('patients')
-    .insert({
-      patient_code: patientCode,
-      full_name: name,
-      age,
-      phone,
-      chronic_history: history,
-      referral_source: referralSource || null,
-    })
-    .select()
-    .single();
-
-  if (pErr) {
-    return NextResponse.json({ error: pErr.message }, { status: 500 });
-  }
-
-  const { data: maxRow } = await supabase
-    .from('queue_entries')
-    .select('queue_num')
-    .order('queue_num', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const queueNum = (maxRow?.queue_num ?? 0) + 1;
-  const checkInTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-  const { data: entry, error: qErr } = await supabase
-    .from('queue_entries')
-    .insert({
+    // 3. Add to Queue (Default to waiting for now)
+    await supabase.from('queue_entries').insert({
       patient_id: patient.id,
-      status: 'waiting',
-      queue_num: queueNum,
-      visit_type: 'كشف عادي (Normal Visit)',
-      payment: 'كاش',
-      check_in_time: checkInTime,
-    })
-    .select()
-    .single();
+      status: 'waiting'
+    });
 
-  if (qErr) {
-    return NextResponse.json({ error: qErr.message }, { status: 500 });
+    return NextResponse.json({ success: true, patientCode: patient.patient_code });
+  } catch (error: any) {
+    console.error('Intake error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
-
-  return NextResponse.json({ ok: true, patient, queue: entry });
 }
