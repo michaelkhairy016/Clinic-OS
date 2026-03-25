@@ -6,6 +6,14 @@
 alter table public.profiles
   add column if not exists approval_status text;
 
+-- Add master role support
+alter table public.profiles
+  drop constraint if exists profiles_role_check;
+
+alter table public.profiles
+  add constraint profiles_role_check
+  check (role in ('doctor', 'assistant', 'marketing', 'master'));
+
 update public.profiles
 set approval_status = 'approved'
 where approval_status is null;
@@ -117,14 +125,22 @@ as $$
 declare
   src text;
   req text;
+  is_master boolean;
 begin
   src := coalesce(new.raw_user_meta_data->>'signup_source', '');
   req := coalesce(new.raw_user_meta_data->>'requested_role', '');
+  is_master := coalesce(new.raw_user_meta_data->>'is_master', 'false')::boolean;
 
-  if src = 'clinic_staff' and req in ('assistant', 'marketing') then
+  if is_master then
+    -- Master account creation (typically done manually in Supabase dashboard)
+    insert into public.profiles (id, email, role, approval_status)
+    values (new.id, new.email, 'master', 'approved');
+  elsif src = 'clinic_staff' and req in ('assistant', 'marketing') then
+    -- Staff signup from web form
     insert into public.profiles (id, email, role, approval_status)
     values (new.id, new.email, req, 'pending');
   else
+    -- Doctor accounts (created directly in Supabase)
     insert into public.profiles (id, email, role, approval_status)
     values (new.id, new.email, 'doctor', 'approved');
   end if;
