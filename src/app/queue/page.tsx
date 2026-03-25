@@ -3,7 +3,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Clock, CheckCircle, UserPlus,
-  Plus, X, Search, UserCheck, AlertCircle, Phone
+  Plus, X, Search, UserCheck, AlertCircle, Phone,
+  ArrowRight, User, MoreHorizontal, Crown
 } from 'lucide-react';
 import { useAuth } from '@/modules/auth/AuthContext';
 import { createClient } from '@/lib/supabase/client';
@@ -250,51 +251,272 @@ export default function QueuePage() {
          </div>
       </div>
 
-      <div className="table-container">
-         <table>
-            <thead>
-               <tr>
-                  <th>No.</th>
-                  <th>Patient Detail</th>
-                  <th>Visit Category</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th>Source</th>
-                  <th>Actions</th>
-               </tr>
-            </thead>
-            <tbody>
-               {queue.map(q => (
-                 <tr key={q.id}>
-                    <td><div style={{ width: '30px', height: '30px', background: 'var(--bg-color)', color: 'var(--primary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>{q.queue_num}</div></td>
-                    <td>
-                       <div style={{ fontWeight: 800 }}>{q.patients?.full_name}</div>
-                       <div style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>{q.patients?.patient_code}</div>
-                    </td>
-                    <td><span className="badge badge-active">{vTypes.find(v => v.id === q.visit_type_id)?.name_ar || 'Consultation'}</span></td>
-                    <td style={{ fontWeight: 800, color: 'var(--success)' }}>{q.amount_paid} EGP</td>
-                    <td><span className={`badge ${q.status === 'done' ? 'badge-active' : q.status === 'active' ? 'badge-waiting' : ''}`}>{q.status}</span></td>
-                    <td>
-                       {q.is_vezeeta ? <span className="badge" style={{ background: '#0070f3', color: 'white' }}>Vezeeta</span> : <span className="badge">Internal</span>}
-                    </td>
-                    <td>
-                       <button className="btn btn-ghost" onClick={async () => {
-                          await supabase.from('queue_entries').update({ status: 'done' }).eq('id', q.id);
-                          loadData();
-                       }}><CheckCircle size={18} style={{ color: 'var(--success)' }}/></button>
-                    </td>
-                 </tr>
-               ))}
-               {queue.length === 0 && (
+      {/* Queue Train Visualization */}
+      <div className="card shadow-sm">
+        <h3 style={{ color: 'var(--primary)', fontWeight: 800, margin: '0 0 1.5rem 0' }}>Patient Queue Line</h3>
+
+        {queue.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-light)' }}>
+            <Clock size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }}/>
+            <div>No patients in queue for {clinicData?.name_ar}</div>
+          </div>
+        ) : (
+          <>
+            {/* Train-style queue visualization */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: '0.5rem',
+              overflowX: 'auto',
+              paddingBottom: '1rem',
+              marginBottom: '1.5rem',
+              scrollbarWidth: 'thin'
+            }}>
+              {queue.map((q, index) => {
+                const isCurrent = q.status === 'active';
+                const isNext = q.status === 'waiting' && index === queue.findIndex(item => item.status === 'waiting');
+                const isWaiting = q.status === 'waiting' && !isNext;
+
+                return (
+                  <React.Fragment key={q.id}>
+                    {/* Patient Card */}
+                    <div
+                      style={{
+                        minWidth: isCurrent ? '280px' : '180px',
+                        padding: '1rem',
+                        borderRadius: '16px',
+                        background: isCurrent ? 'var(--primary)' : isNext ? '#e6f4ff' : 'var(--bg-color)',
+                        border: `2px solid ${isCurrent ? 'var(--primary)' : isNext ? '#0070f3' : 'var(--border)'}`,
+                        boxShadow: isCurrent ? '0 4px 12px rgba(30, 58, 138, 0.3)' : 'none',
+                        flex: isCurrent ? '1.2' : '1',
+                        transition: 'all 0.3s ease'
+                      }}
+                    >
+                      {/* Status Badge */}
+                      <div style={{
+                        marginBottom: '0.5rem',
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        color: isCurrent ? 'white' : isNext ? '#0070f3' : 'var(--text-light)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                      }}>
+                        {isCurrent ? (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Crown size={14} /> Currently Inside
+                          </span>
+                        ) : isNext ? 'Next Patient' : `Position #${index}`}
+                      </div>
+
+                      {/* Queue Number */}
+                      <div style={{
+                        width: '36px',
+                        height: '36px',
+                        background: isCurrent ? 'white' : isNext ? '#0070f3' : 'var(--primary)',
+                        color: isCurrent ? 'var(--primary)' : 'white',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 800,
+                        fontSize: '1rem',
+                        marginBottom: '0.5rem'
+                      }}>
+                        {q.queue_num}
+                      </div>
+
+                      {/* Patient Name */}
+                      <div style={{
+                        fontWeight: 800,
+                        fontSize: isCurrent ? '1.1rem' : '0.95rem',
+                        color: isCurrent ? 'white' : 'var(--text)',
+                        marginBottom: '0.25rem',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {q.patients?.full_name}
+                      </div>
+
+                      {/* Patient Code */}
+                      <div style={{
+                        fontSize: '0.8rem',
+                        color: isCurrent ? 'rgba(255,255,255,0.8)' : 'var(--text-light)',
+                        marginBottom: '0.5rem'
+                      }}>
+                        {q.patients?.patient_code}
+                      </div>
+
+                      {/* Visit Type */}
+                      <div style={{
+                        fontSize: '0.75rem',
+                        color: isCurrent ? 'rgba(255,255,255,0.9)' : 'var(--text-light)',
+                        fontWeight: 600
+                      }}>
+                        {vTypes.find(v => v.id === q.visit_type_id)?.name_ar || 'Consultation'}
+                      </div>
+
+                      {/* Vezeeta Badge */}
+                      {q.is_vezeeta && (
+                        <div style={{
+                          marginTop: '0.5rem',
+                          padding: '2px 8px',
+                          background: isCurrent ? 'rgba(255,255,255,0.2)' : '#0070f3',
+                          color: 'white',
+                          borderRadius: '12px',
+                          fontSize: '0.7rem',
+                          fontWeight: 800,
+                          display: 'inline-block'
+                        }}>
+                          Vezeeta
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Arrow between patients */}
+                    {index < queue.length - 1 && (
+                      <ArrowRight
+                        size={20}
+                        style={{
+                          color: 'var(--border)',
+                          flexShrink: 0
+                        }}
+                      />
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+
+            {/* Quick Actions Panel */}
+            <div style={{
+              display: 'grid',
+              gap: '1rem',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))'
+            }}>
+              {/* Current Patient Info */}
+              {queue.find(q => q.status === 'active') && (
+                <div style={{
+                  background: 'linear-gradient(135deg, var(--primary), #1e3a8a)',
+                  color: 'white',
+                  padding: '1.5rem',
+                  borderRadius: '16px'
+                }}>
+                  <div style={{ fontSize: '0.8rem', opacity: 0.8, marginBottom: '0.5rem', fontWeight: 800 }}>
+                    CURRENTLY WITH DOCTOR
+                  </div>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '0.25rem' }}>
+                    {queue.find(q => q.status === 'active')?.patients?.full_name}
+                  </div>
+                  <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>
+                    Ticket #{queue.find(q => q.status === 'active')?.queue_num} •
+                    {queue.find(q => q.status === 'active')?.patients?.patient_code}
+                  </div>
+                </div>
+              )}
+
+              {/* Next Patient Info */}
+              {queue.find((q, i) => q.status === 'waiting' && i === queue.findIndex(item => item.status === 'waiting')) && (
+                <div style={{
+                  background: '#e6f4ff',
+                  border: '2px solid #0070f3',
+                  padding: '1.5rem',
+                  borderRadius: '16px',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    position: 'absolute',
+                    top: '8px',
+                    right: '8px',
+                    background: '#0070f3',
+                    color: 'white',
+                    padding: '4px 8px',
+                    borderRadius: '8px',
+                    fontSize: '0.7rem',
+                    fontWeight: 800
+                  }}>
+                    NEXT UP
+                  </div>
+                  <div style={{ color: '#0070f3', fontSize: '1.1rem', fontWeight: 800, marginBottom: '0.25rem', marginTop: '0.5rem' }}>
+                    {queue.find((q, i) => q.status === 'waiting' && i === queue.findIndex(item => item.status === 'waiting'))?.patients?.full_name}
+                  </div>
+                  <div style={{ color: 'var(--text-light)', fontSize: '0.9rem' }}>
+                    Ticket #{queue.find((q, i) => q.status === 'waiting' && i === queue.findIndex(item => item.status === 'waiting'))?.queue_num} •
+                    {queue.find((q, i) => q.status === 'waiting' && i === queue.findIndex(item => item.status === 'waiting'))?.patients?.patient_code}
+                  </div>
+                </div>
+              )}
+
+              {/* Queue Stats */}
+              <div style={{
+                background: 'var(--bg-color)',
+                padding: '1.5rem',
+                borderRadius: '16px',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--primary)', marginBottom: '0.25rem' }}>
+                  {queue.filter(q => q.status === 'waiting').length}
+                </div>
+                <div style={{ color: 'var(--text-light)', fontSize: '0.9rem' }}>
+                  Waiting in Queue
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Detailed Table for Admin View */}
+      <div className="card shadow-sm">
+        <h3 style={{ color: 'var(--primary)', fontWeight: 800, margin: '0 0 1rem 0' }}>Full Queue Details</h3>
+        <div className="table-container">
+           <table>
+              <thead>
                  <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-light)' }}>
-                       <Clock size={32} style={{ margin: '0 auto 10px', opacity: 0.5 }}/>
-                       <div>No patients in queue for {clinicData?.name_ar}</div>
-                    </td>
+                    <th>No.</th>
+                    <th>Patient Detail</th>
+                    <th>Visit Category</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Source</th>
+                    <th>Actions</th>
                  </tr>
-               )}
-            </tbody>
-         </table>
+              </thead>
+              <tbody>
+                 {queue.map(q => (
+                   <tr key={q.id}>
+                      <td><div style={{ width: '30px', height: '30px', background: 'var(--bg-color)', color: 'var(--primary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>{q.queue_num}</div></td>
+                      <td>
+                         <div style={{ fontWeight: 800 }}>{q.patients?.full_name}</div>
+                         <div style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>{q.patients?.patient_code}</div>
+                      </td>
+                      <td><span className="badge badge-active">{vTypes.find(v => v.id === q.visit_type_id)?.name_ar || 'Consultation'}</span></td>
+                      <td style={{ fontWeight: 800, color: 'var(--success)' }}>{q.amount_paid} EGP</td>
+                      <td><span className={`badge ${q.status === 'done' ? 'badge-active' : q.status === 'active' ? 'badge-waiting' : ''}`}>{q.status}</span></td>
+                      <td>
+                         {q.is_vezeeta ? <span className="badge" style={{ background: '#0070f3', color: 'white' }}>Vezeeta</span> : <span className="badge">Internal</span>}
+                      </td>
+                      <td>
+                         <button className="btn btn-ghost" onClick={async () => {
+                            await supabase.from('queue_entries').update({ status: 'done' }).eq('id', q.id);
+                            loadData();
+                         }}><CheckCircle size={18} style={{ color: 'var(--success)' }}/></button>
+                      </td>
+                   </tr>
+                 ))}
+                 {queue.length === 0 && (
+                   <tr>
+                      <td colSpan={7} style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-light)' }}>
+                         <Clock size={32} style={{ margin: '0 auto 10px', opacity: 0.5 }}/>
+                         <div>No patients in queue for {clinicData?.name_ar}</div>
+                      </td>
+                   </tr>
+                 )}
+              </tbody>
+           </table>
+        </div>
       </div>
 
       {showCheckInModal && (
