@@ -605,7 +605,11 @@ export default function AnalyticsPage() {
                 disabled={loading}
                 style={{ flex: 1, padding: '1.2rem', fontSize: '1.1rem' }}
               >
-                {loading ? 'Scheduling...' : <><Phone size={20} /> Schedule Follow-up}
+                {loading ? 'Scheduling...' : (
+                  <>
+                    <Phone size={20} /> Schedule Follow-up}
+                  </>
+                )}
               </button>
               <button
                 className="btn btn-secondary"

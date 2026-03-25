@@ -433,7 +433,11 @@ export default function QueuePage() {
                 disabled={loading}
                 style={{ padding: '1.2rem', fontSize: '1.1rem', borderRadius: '14px', marginTop: '1rem', width: '100%' }}
               >
-                {loading ? 'Processing...' : <><Plus size={20}/> Confirm & Print Ticket
+                {loading ? 'Processing...' : (
+                  <>
+                    <Plus size={20}/> Confirm & Print Ticket
+                  </>
+                )}
               </button>
            </div>
         </div>

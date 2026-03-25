@@ -379,7 +379,11 @@ export default function AssistantPage() {
                         disabled={loading}
                         style={{ marginTop: '1rem', width: '100%', padding: '1rem' }}
                       >
-                        {loading ? 'Processing...' : <><CheckCircle2 size={20} /> Verify & Add to Queue
+                        {loading ? 'Processing...' : (
+                          <>
+                            <CheckCircle2 size={20} /> Verify & Add to Queue
+                          </>
+                        )}
                       </button>
                     </div>
                   )}

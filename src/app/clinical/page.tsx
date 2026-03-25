@@ -250,7 +250,11 @@ export default function ClinicalPage() {
                  </select>
                  <button className="btn btn-primary" onClick={handlePrintRx} disabled={!activePatient || saving}><Printer size={18} /> Print Rx PDF</button>
                  <button className="btn btn-success" onClick={handleSaveVisit} disabled={!activePatient || saving} style={{ background: 'var(--success)', borderColor: 'var(--success)' }}>
-                   {saving ? 'Saving...' : <><Save size={18} /> Save File}
+                   {saving ? 'Saving...' : (
+                     <>
+                       <Save size={18} /> Save File
+                     </>
+                   )}
                  </button>
               </div>
            </div>

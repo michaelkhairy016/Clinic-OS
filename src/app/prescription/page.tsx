@@ -681,7 +681,11 @@ export default function PrescriptionPage() {
                   disabled={loading || finalPrescription.length === 0}
                   style={{ flex: 1, padding: '1.2rem', fontSize: '1.1rem' }}
                 >
-                  {loading ? 'Saving...' : <><Save size={20} /> Save Prescription
+                  {loading ? 'Saving...' : (
+                    <>
+                      <Save size={20} /> Save Prescription
+                    </>
+                  )}
                 </button>
                 <button
                   className="btn btn-secondary"
