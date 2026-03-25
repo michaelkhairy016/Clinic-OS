@@ -6,7 +6,7 @@ import {
   Calendar, MessageSquare, Share2, BarChart3,
   PieChart, Filter, Download, CheckCircle2,
   AlertCircle, Clock, ArrowRight, UserPlus,
-  Star, ThumbsUp, ThumbsDown
+  Star, ThumbsUp, ThumbsDown, Plus, X
 } from 'lucide-react';
 import { useAuth } from '@/modules/auth/AuthContext';
 import { createClient } from '@/lib/supabase/client';
@@ -63,7 +63,7 @@ export default function MarketingDashboard() {
         referralRes
       ] = await Promise.all([
         supabase.from('patients').select('*', { count: 'exact', head: true }),
-        supabase.from('patients').select('*').gte('created_at', new Date(new Date().setDate(1).toISOString()).toISOString()),
+        supabase.from('patients').select('*').gte('created_at', new Date(new Date().setDate(1)).toISOString()),
         supabase.from('patients').select('*').eq('is_vezeeta', true),
         supabase.from('patients').select('*, referral_sources(name_ar, name_en)')
       ]);
@@ -82,8 +82,8 @@ export default function MarketingDashboard() {
 
       const referralArray = Object.entries(referralCounts).map(([source, count]) => ({
         source,
-        count,
-        percentage: totalPatients > 0 ? ((count / totalPatients.count) * 100).toFixed(1) : '0'
+        count: count as number,
+        percentage: totalPatients > 0 ? (((count as number) / totalPatients) * 100).toFixed(1) : '0'
       }));
 
       setReferralData(referralArray.sort((a, b) => b.count - a.count).slice(0, 5));
@@ -118,7 +118,7 @@ export default function MarketingDashboard() {
       { patient: 'Layla Mahmoud', rating: 3, date: '2024-03-17', feedback: 'Average wait time, but good treatment' }
     ];
     setSatisfactionScores(scores);
-    setAverageRating((scores.reduce((sum, s) => sum + s.rating, 0) / scores.length).toFixed(1));
+    setAverageRating(Number((scores.reduce((sum, s) => sum + s.rating, 0) / scores.length).toFixed(1)));
   }, []);
 
   const handleScheduleFollowUp = async () => {

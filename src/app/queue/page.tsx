@@ -124,7 +124,7 @@ export default function QueuePage() {
   const handleCheckIn = async (pId: string | null = null) => {
     // Validation
     const validation = validateQueueCheckIn({
-      patientId: pId,
+      patientId: pId ?? undefined,
       searchName: selectedPatient ? selectedPatient.full_name : searchName,
       visitTypeId: selVTypeId,
       paymentMethodId: selPMethodId,

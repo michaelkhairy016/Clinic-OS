@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { QRCodeSVG } from 'react-qr-code';
+import QRCodeSVG from 'react-qr-code';
 import { Scan, CheckCircle2, Clock, User } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { validatePatientForm, formatValidationErrors, sanitizePhoneNumber, isValidEmail } from '@/lib/validation';

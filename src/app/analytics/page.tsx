@@ -6,7 +6,7 @@ import {
   Share2, Phone, Calendar, MessageSquare, BarChart3,
   PieChart, Star, Filter, Download, UserPlus,
   Clock, CheckCircle2, AlertCircle, ThumbsUp, ThumbsDown,
-  ArrowRight, Mail, Facebook, Instagram
+  ArrowRight, Mail, Facebook, Instagram, Plus, X
 } from 'lucide-react';
 import { useAuth } from '@/modules/auth/AuthContext';
 import { createClient } from '@/lib/supabase/client';
@@ -82,7 +82,7 @@ export default function AnalyticsPage() {
         ageData
       ] = await Promise.all([
         supabase.from('patients').select('*', { count: 'exact', head: true }),
-        supabase.from('patients').select('*').gte('created_at', new Date(new Date().setDate(1).toISOString()).toISOString()),
+        supabase.from('patients').select('*').gte('created_at', new Date(new Date().setDate(1)).toISOString()),
         supabase.from('patients').select('*').eq('is_vezeeta', true),
         supabase.from('patients').select('age')
       ]);
@@ -128,9 +128,9 @@ export default function AnalyticsPage() {
 
       const referralArray = Object.entries(referralCounts).map(([source, count]) => ({
         source,
-        count,
-        percentage: totalPatients > 0 ? ((count / totalPatients) * 100).toFixed(1) : '0',
-        isNewPatients: (newRes.data || []).filter((p: any) => p.referral_sources?.name_ar === source).length
+        count: count as number,
+        percentage: totalPatients > 0 ? (((count as number) / totalPatients) * 100).toFixed(1) : '0',
+        isNewPatients: 0 // TODO: implement new patients per referral source
       })).sort((a, b) => b.count - a.count);
 
       setReferralStats(referralArray.slice(0, 8));
@@ -147,7 +147,7 @@ export default function AnalyticsPage() {
         { patient: 'Mohamed Ali', patient_code: 'P-1005', rating: 5, date: '2024-03-15', feedback: 'Excellent care and follow-up' }
       ];
       setSatisfactionScores(scores);
-      setAverageRating((scores.reduce((sum, s) => sum + s.rating, 0) / scores.length).toFixed(1));
+      setAverageRating(Number((scores.reduce((sum, s) => sum + s.rating, 0) / scores.length).toFixed(1)));
     }, []);
 
     // Follow-ups
