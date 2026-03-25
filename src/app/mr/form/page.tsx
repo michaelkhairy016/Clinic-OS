@@ -148,7 +148,11 @@ export default function MRIntakeForm() {
             </div>
 
             <button disabled={loading} className="btn btn-primary" style={{ width: '100%', padding: '1.25rem', marginTop: '1rem', fontSize: '1.2rem', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-               {loading ? <Loader2 className="spinner" /> : <><Send size={20}/> {t.submit}</>}
+               {loading ? <Loader2 className="spinner" /> : (
+                 <>
+                   <Send size={20}/> {t.submit}
+                 </>
+               )}
             </button>
             <p style={{ textAlign: 'center', color: 'var(--text-light)', fontSize: '0.9rem' }}>د. أمجد خيري كامل - Dr. Amgad Khairy Kamel</p>
           </form>

@@ -649,7 +649,11 @@ export default function AssistantPage() {
                   fontWeight: 800
                 }}
               >
-                {loading ? 'Processing...' : <><DollarSign size={20} /> Record Payment
+                {loading ? 'Processing...' : (
+                  <>
+                    <DollarSign size={20} /> Record Payment
+                  </>
+                )}
               </button>
             </form>
 

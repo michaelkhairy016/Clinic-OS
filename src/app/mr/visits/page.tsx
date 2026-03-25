@@ -136,12 +136,16 @@ export default function MRVisitsPage() {
                    <input value={newMedCategory} onChange={e => setNewMedCategory(e.target.value)} placeholder="e.g. SSRI, Antipsychotic" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)' }} />
                 </div>
                 <button 
-                  disabled={addingMed} 
-                  className="btn btn-primary" 
+                  disabled={addingMed}
+                  className="btn btn-primary"
                   onClick={handleAddMed}
                   style={{ marginTop: '1rem', width: '100%' }}
                 >
-                   {addingMed ? <Loader2 className="spinner"/> : <><Save size={18}/> Save to Clinical Brain</>}
+                   {addingMed ? <Loader2 className="spinner"/> : (
+                     <>
+                       <Save size={18}/> Save to Clinical Brain
+                     </>
+                   )}
                 </button>
              </div>
           </div>
