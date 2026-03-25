@@ -103,9 +103,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         await refreshProfile(session?.user ?? null);
       } catch (err) {
         console.error('Profile refresh failed:', err);
-      } finally {
-        setLoading(false);
       }
+      // Don't set loading false here - let the initial init() handle it
+      // Only update state, don't toggle loading flag
     });
 
     return () => {
