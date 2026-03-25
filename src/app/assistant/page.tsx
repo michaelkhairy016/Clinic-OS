@@ -457,7 +457,11 @@ export default function AssistantPage() {
                 disabled={loading}
                 style={{ flex: 1, padding: '1rem' }}
               >
-                {loading ? 'Processing...' : <><CheckCircle2 size={20} /> Verify & Add to Queue
+                {loading ? 'Processing...' : (
+                  <>
+                    <CheckCircle2 size={20} /> Verify & Add to Queue
+                  </>
+                )}
               </button>
               <button
                 className="btn btn-secondary"

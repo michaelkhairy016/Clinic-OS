@@ -607,7 +607,7 @@ export default function AnalyticsPage() {
               >
                 {loading ? 'Scheduling...' : (
                   <>
-                    <Phone size={20} /> Schedule Follow-up}
+                    <Phone size={20} /> Schedule Follow-up
                   </>
                 )}
               </button>

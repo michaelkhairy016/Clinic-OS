@@ -654,7 +654,11 @@ export default function MarketingDashboard() {
                 disabled={loading}
                 style={{ flex: 1, padding: '1.2rem', fontSize: '1.1rem', fontWeight: 800 }}
               >
-                {loading ? 'Creating...' : <><Plus size={20} /> Create Campaign
+                {loading ? 'Creating...' : (
+                  <>
+                    <Plus size={20} /> Create Campaign
+                  </>
+                )}
               </button>
               <button
                 className="btn btn-secondary"
