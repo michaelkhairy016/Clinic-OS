@@ -78,6 +78,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const supabase = createClient();
     let cancelled = false;
 
+    // Timeout to ensure loading never hangs forever
+    const timeoutId = setTimeout(() => {
+      if (!cancelled) {
+        console.warn('Auth initialization timed out after 10 seconds');
+        setLoading(false);
+      }
+    }, 10000);
+
     const init = async () => {
       try {
         const {
@@ -87,6 +95,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } catch (err) {
         console.error('Auth initialization failed:', err);
       } finally {
+        clearTimeout(timeoutId);
         if (!cancelled) setLoading(false);
       }
       if (typeof window !== 'undefined') {

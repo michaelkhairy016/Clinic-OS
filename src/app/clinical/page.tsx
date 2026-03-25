@@ -41,9 +41,29 @@ export default function ClinicalPage() {
   const [activeQueueEntryId, setActiveQueueEntryId] = useState<string | null>(null);
 
   const [visitType, setVisitType] = useState('Consultation');
-  const [diagnosis, setDiagnosis] = useState('');
+  const [selectedDiagnosisCategory, setSelectedDiagnosisCategory] = useState<string | null>(null);
+  const [customDiagnosis, setCustomDiagnosis] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Get final diagnosis value
+  const diagnosis = selectedDiagnosisCategory === 'other' ? customDiagnosis : (selectedDiagnosisCategory || '');
+
+  // Diagnosis categories for quick selection
+  const diagnosisCategories = [
+    { key: 'depression', labelEn: 'Depression', labelAr: 'اكتئاب' },
+    { key: 'anxiety', labelEn: 'Anxiety', labelAr: 'قلق' },
+    { key: 'bipolar', labelEn: 'Bipolar Disorder', labelAr: 'اضطراب ثنائي القطب' },
+    { key: 'schizophrenia', labelEn: 'Schizophrenia', labelAr: 'فصام' },
+    { key: 'adhd', labelEn: 'ADHD', labelAr: 'فرط الحركة' },
+    { key: 'ocd', labelEn: 'OCD', labelAr: 'وسواس قهري' },
+    { key: 'ptsd', labelEn: 'PTSD', labelAr: 'اضطراب ما بعد الصدمة' },
+    { key: 'insomnia', labelEn: 'Insomnia', labelAr: 'أرق' },
+    { key: 'dementia', labelEn: 'Dementia', labelAr: 'خرف' },
+    { key: 'substance', labelEn: 'Substance Use', labelAr: 'إدمان' },
+    { key: 'personality', labelEn: 'Personality Disorder', labelAr: 'اضطراب شخصية' },
+    { key: 'other', labelEn: 'Other', labelAr: 'أخرى' }
+  ];
 
   // History State
   const [pastVisits, setPastVisits] = useState<PastVisit[]>([]);
@@ -200,7 +220,8 @@ export default function ClinicalPage() {
       await completePatientVisit(activeQueueEntryId);
 
       // Clear form and show success
-      setDiagnosis('');
+      setSelectedDiagnosisCategory(null);
+      setCustomDiagnosis('');
       setNotes('');
       setPrescription([]);
       setActivePatient(null);
@@ -307,19 +328,55 @@ export default function ClinicalPage() {
             <h3 style={{ borderBottom: '1px solid var(--border)', paddingBottom: '1rem', marginBottom: '1.5rem' }}><FileText size={20} style={{ marginBottom: '-4px', marginRight: '8px' }}/> Clinical Impressions</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               <div>
-                <label style={{ display: 'block', fontWeight: 800, marginBottom: '8px' }}>Diagnosis / Reason for Visit</label>
-                <input
-                  value={diagnosis}
-                  onChange={e => setDiagnosis(e.target.value)}
-                  placeholder="e.g. Major Depressive Disorder, ADHD Assessment"
-                  style={{
-                    width: '100%',
-                    padding: '14px',
-                    borderRadius: '12px',
-                    border: errors.diagnosis ? '2px solid #df4759' : '1px solid var(--border)',
-                    fontSize: '1.1rem'
-                  }}
-                />
+                <label style={{ display: 'block', fontWeight: 800, marginBottom: '12px' }}>Diagnosis / التشخيص</label>
+                {/* Category-based diagnosis selection */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px', marginBottom: '1rem' }}>
+                  {diagnosisCategories.map(option => (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() => setSelectedDiagnosisCategory(selectedDiagnosisCategory === option.key ? null : option.key)}
+                      style={{
+                        padding: '12px 8px',
+                        border: selectedDiagnosisCategory === option.key ? '2px solid var(--primary)' : '1px solid var(--border)',
+                        borderRadius: '10px',
+                        background: selectedDiagnosisCategory === option.key ? '#e6f4ff' : 'white',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        textAlign: 'center'
+                      }}
+                    >
+                      <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '2px' }}>
+                        {option.labelAr}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-light)' }}>
+                        {option.labelEn}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                {/* Custom diagnosis input when "Other" is selected */}
+                {selectedDiagnosisCategory === 'other' && (
+                  <input
+                    value={customDiagnosis}
+                    onChange={e => setCustomDiagnosis(e.target.value)}
+                    placeholder="Enter diagnosis manually..."
+                    style={{
+                      width: '100%',
+                      padding: '14px',
+                      borderRadius: '12px',
+                      border: errors.diagnosis ? '2px solid #df4759' : '1px solid var(--border)',
+                      fontSize: '1rem',
+                      marginTop: '8px'
+                    }}
+                  />
+                )}
+                {/* Show selected diagnosis */}
+                {selectedDiagnosisCategory && selectedDiagnosisCategory !== 'other' && (
+                  <div style={{ padding: '10px 14px', background: '#f0f7ff', borderRadius: '8px', fontSize: '0.9rem', color: 'var(--primary)', fontWeight: 600 }}>
+                    Selected: {diagnosisCategories.find(d => d.key === selectedDiagnosisCategory)?.labelEn} / {diagnosisCategories.find(d => d.key === selectedDiagnosisCategory)?.labelAr}
+                  </div>
+                )}
                 {errors.diagnosis && <div style={{ color: '#df4759', fontSize: '0.85rem', marginTop: '4px' }}>{errors.diagnosis}</div>}
               </div>
               <div>
