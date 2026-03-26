@@ -41,10 +41,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
-  // Initialize activeClinicId from localStorage synchronously on mount
+  // Initialize activeClinicId from sessionStorage (session-only, cleared on tab close)
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('clinic_os_active_clinic');
+      const saved = sessionStorage.getItem('clinic_os_active_clinic');
       if (saved) setActiveClinicIdState(saved);
     }
   }, []);
@@ -52,8 +52,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const setActiveClinicId = (id: string | null) => {
     setActiveClinicIdState(id);
     if (typeof window !== 'undefined') {
-      if (id) localStorage.setItem('clinic_os_active_clinic', id);
-      else localStorage.removeItem('clinic_os_active_clinic');
+      if (id) sessionStorage.setItem('clinic_os_active_clinic', id);
+      else sessionStorage.removeItem('clinic_os_active_clinic');
     }
   };
 
@@ -239,6 +239,35 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setRole(null);
     setApprovalStatus(null);
     setError(null);
+
+    // NUKE: Clear all caches and storage on logout
+    if (typeof window !== 'undefined') {
+      // Tell service worker to clear caches
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage('CLEAR_ALL_CACHES');
+      }
+
+      // Unregister all service workers
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          registrations.forEach(reg => reg.unregister());
+        });
+      }
+
+      // Clear all CacheStorage
+      if ('caches' in window) {
+        caches.keys().then(names => {
+          names.forEach(name => caches.delete(name));
+        });
+      }
+
+      // Clear all browser storage
+      localStorage.clear();
+      sessionStorage.clear();
+
+      // Force hard reload to login
+      window.location.href = '/';
+    }
   };
 
   const retryInit = useCallback(() => {

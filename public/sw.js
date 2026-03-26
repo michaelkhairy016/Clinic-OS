@@ -1,11 +1,25 @@
-// Clinic-OS Service Worker for PWA Support
-// Version 3 with TTL support
-const CACHE_NAME = 'clinic-os-v3-20260326';
-const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+// Clinic-OS Service Worker v4
+// NEVER caches auth routes - network-first for all HTML
+const CACHE_NAME = 'clinic-os-v4-20260326-auth-fix';
+const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 const STATIC_ASSETS = [
   '/manifest.json',
   '/icon-192x192.png',
   '/icon-512x512.png'
+];
+
+// Routes that must NEVER be cached (always live from server)
+const NEVER_CACHE_ROUTES = [
+  '/api/',
+  '/auth',
+  '/login',
+  '/dashboard',
+  '/queue',
+  '/clinical',
+  '/analytics',
+  '/marketing',
+  '/approvals',
+  '/settings'
 ];
 
 // TTL-aware cache helpers
@@ -14,22 +28,18 @@ const cacheWithTTL = {
     const cached = await cache.match(request);
     if (!cached) return null;
 
-    // Check TTL
     const cachedTime = cached.headers.get('x-cached-time');
     if (cachedTime) {
       const age = Date.now() - parseInt(cachedTime, 10);
       if (age > CACHE_TTL) {
-        // Stale, delete and return null
         await cache.delete(request);
         return null;
       }
     }
-
     return cached;
   },
 
   async set(cache, request, response) {
-    // Clone response and add timestamp header
     const headers = new Headers(response.headers);
     headers.set('x-cached-time', Date.now().toString());
 
@@ -43,11 +53,18 @@ const cacheWithTTL = {
   }
 };
 
+// Check if URL should never be cached
+const shouldNeverCache = (pathname) => {
+  return NEVER_CACHE_ROUTES.some(route => pathname.startsWith(route)) ||
+         pathname.includes('supabase') ||
+         pathname.includes('auth');
+};
+
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(STATIC_ASSETS))
-      .then(() => self.skipWaiting()) // Activate immediately
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -56,15 +73,24 @@ self.addEventListener('activate', event => {
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cacheName => {
-          // Delete old caches
           if (cacheName !== CACHE_NAME) {
-            console.log('Deleting old cache:', cacheName);
+            console.log('SW: Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
-    }).then(() => self.clients.claim()) // Take control immediately
+    }).then(() => self.clients.claim())
   );
+});
+
+// Listen for messages from the app (e.g., logout -> clear all caches)
+self.addEventListener('message', event => {
+  if (event.data === 'CLEAR_ALL_CACHES') {
+    console.log('SW: Clearing all caches on auth change');
+    caches.keys().then(names => {
+      names.forEach(name => caches.delete(name));
+    });
+  }
 });
 
 self.addEventListener('fetch', event => {
@@ -76,48 +102,32 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Skip auth-related requests and API calls - always go to network
-  if (url.pathname.startsWith('/api/') ||
-      url.pathname.includes('supabase') ||
-      url.pathname.includes('auth') ||
+  // CRITICAL: Auth and API routes - ALWAYS network only, never cache
+  if (shouldNeverCache(url.pathname) ||
       url.host.includes('supabase') ||
       request.headers.get('Authorization')) {
-    event.respondWith(fetch(request));
-    return;
-  }
-
-  // For HTML pages - network first, fallback to cache
-  if (request.headers.get('Accept')?.includes('text/html')) {
     event.respondWith(
-      fetch(request)
-        .then(response => {
-          // Cache successful responses
-          if (response.status === 200) {
-            caches.open(CACHE_NAME).then(cache => {
-              cacheWithTTL.set(cache, request, response);
-            });
-          }
-          return response;
-        })
-        .catch(() => {
-          // Network failed, try cache with TTL
-          return caches.open(CACHE_NAME).then(cache =>
-            cacheWithTTL.get(cache, request).then(cached =>
-              cached || caches.match('/')
-            )
-          );
-        })
+      fetch(request).catch(() => new Response('Network error', { status: 503 }))
     );
     return;
   }
 
-  // For static assets - cache first with TTL, fallback to network
+  // For HTML pages - ALWAYS network first (no caching for pages)
+  if (request.headers.get('Accept')?.includes('text/html')) {
+    event.respondWith(
+      fetch(request)
+        .then(response => response)
+        .catch(() => caches.match('/'))
+    );
+    return;
+  }
+
+  // For static assets only - cache first with TTL
   event.respondWith(
     caches.open(CACHE_NAME).then(async cache => {
       const cached = await cacheWithTTL.get(cache, request);
 
       if (cached) {
-        // Return cache but update in background
         fetch(request).then(response => {
           if (response.status === 200) {
             cacheWithTTL.set(cache, request, response);
@@ -126,7 +136,6 @@ self.addEventListener('fetch', event => {
         return cached;
       }
 
-      // Not in cache or stale, fetch from network
       return fetch(request).then(response => {
         if (response.status === 200) {
           cacheWithTTL.set(cache, request, response);
