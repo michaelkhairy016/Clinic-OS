@@ -64,26 +64,31 @@ export default function PatientForm() {
     e.preventDefault();
     setLoading(true);
     try {
-      // Logic for new patient registration
-      const { data: pData, error: pErr } = await supabase.from('patients').insert({
-        full_name: fullName,
-        age: Number(age),
-        phone,
-        district_id: districtId || null,
-        referral_source_id: sourceId || null,
-        is_first_psych_visit: isFirstVisit,
-        previous_doctor: prevDoc,
-        is_vezeeta: isVezeeta,
-        chronic_history: chronic
-      }).select().single();
+      // Call the Edge Function to create patient (bypasses RLS)
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const response = await fetch(`${supabaseUrl}/functions/v1/patient-intake`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName,
+          age: Number(age),
+          phone,
+          districtId: districtId || null,
+          sourceId: sourceId || null,
+          isFirstVisit,
+          prevDoc,
+          prevMeds,
+          isVezeeta,
+          chronic
+        })
+      });
 
-      if (pErr) throw pErr;
+      const result = await response.json();
 
-      // Handle medications relation
-      if (prevMeds.length > 0) {
-        const medInserts = prevMeds.map(mId => ({ patient_id: pData.id, medication_id: mId }));
-        await supabase.from('patient_previous_meds').insert(medInserts);
+      if (!response.ok || result.error) {
+        throw new Error(result.error || 'Failed to register patient');
       }
+
       setSuccess(true);
     } catch (err: any) {
       alert(err.message);
