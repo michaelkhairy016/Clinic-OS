@@ -54,16 +54,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
     setUser(sessionUser);
     const supabase = createClient();
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
       .select('role, approval_status')
       .eq('id', sessionUser.id)
       .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching profile:', error);
+    }
+
     if (!data) {
+      console.warn('No profile found for user:', sessionUser.id);
       setRole(null);
       setApprovalStatus(null);
       return;
     }
+
+    console.log('Profile loaded:', data);
     setRole((data.role as UserRole) ?? null);
     const raw = data.approval_status as string | undefined;
     setApprovalStatus(raw === 'pending' ? 'pending' : 'approved');
@@ -77,10 +85,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const supabase = createClient();
     let cancelled = false;
+    let initCompleted = false;
 
     // Timeout to ensure loading never hangs forever
     const timeoutId = setTimeout(() => {
-      if (!cancelled) {
+      if (!cancelled && !initCompleted) {
         console.warn('Auth initialization timed out after 10 seconds');
         setLoading(false);
       }
@@ -91,10 +100,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const {
           data: { user: u },
         } = await supabase.auth.getUser();
-        if (!cancelled) await refreshProfile(u);
+        if (!cancelled && u) {
+          await refreshProfile(u);
+        }
       } catch (err) {
         console.error('Auth initialization failed:', err);
       } finally {
+        initCompleted = true;
         clearTimeout(timeoutId);
         if (!cancelled) setLoading(false);
       }
