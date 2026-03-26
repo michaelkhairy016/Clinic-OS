@@ -25,6 +25,8 @@ interface AuthState {
   language: 'en' | 'ar';
   activeClinicId: string | null;
   setActiveClinicId: (id: string | null) => void;
+  error: string | null;
+  retryInit: () => void;
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
@@ -36,6 +38,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [language, setLanguage] = useState<'en' | 'ar'>('ar');
   const [activeClinicId, setActiveClinicIdState] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+
+  // Initialize activeClinicId from localStorage synchronously on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('clinic_os_active_clinic');
+      if (saved) setActiveClinicIdState(saved);
+    }
+  }, []);
 
   const setActiveClinicId = (id: string | null) => {
     setActiveClinicIdState(id);
@@ -45,36 +57,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const refreshProfile = useCallback(async (sessionUser: User | null) => {
-    if (!sessionUser) {
-      setUser(null);
-      setRole(null);
-      setApprovalStatus(null);
-      return;
-    }
-    setUser(sessionUser);
+  // Fetch profile with retry logic
+  const fetchProfileWithRetry = useCallback(async (userId: string): Promise<{ role: string | null; approval_status: string | null } | null> => {
     const supabase = createClient();
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('role, approval_status')
-      .eq('id', sessionUser.id)
-      .maybeSingle();
+    let retries = 3;
+    let lastError = null;
 
-    if (error) {
-      console.error('Error fetching profile:', error);
+    while (retries > 0) {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('role, approval_status')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (error) {
+        lastError = error;
+        retries--;
+        if (retries > 0) {
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      } else {
+        return data;
+      }
     }
 
-    if (!data) {
-      console.warn('No profile found for user:', sessionUser.id);
-      setRole(null);
-      setApprovalStatus(null);
-      return;
-    }
-
-    console.log('Profile loaded:', data);
-    setRole((data.role as UserRole) ?? null);
-    const raw = data.approval_status as string | undefined;
-    setApprovalStatus(raw === 'pending' ? 'pending' : 'approved');
+    console.error('Profile fetch failed after retries:', lastError);
+    return null;
   }, []);
 
   useEffect(() => {
@@ -87,53 +95,82 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     let cancelled = false;
     let initCompleted = false;
 
-    // Timeout to ensure loading never hangs forever
+    // Reduced timeout with error state
     const timeoutId = setTimeout(() => {
       if (!cancelled && !initCompleted) {
-        console.warn('Auth initialization timed out after 10 seconds');
+        console.warn('Auth initialization timed out');
+        setError('Connection timeout. Please check your network and try again.');
         setLoading(false);
       }
-    }, 10000);
+    }, 8000);
 
     const init = async () => {
       try {
+        setError(null);
+
         const {
           data: { user: u },
         } = await supabase.auth.getUser();
-        if (!cancelled && u) {
-          await refreshProfile(u);
+
+        if (cancelled) return;
+
+        if (u) {
+          setUser(u);
+          const profileData = await fetchProfileWithRetry(u.id);
+
+          if (cancelled) return;
+
+          if (profileData) {
+            setRole((profileData.role as UserRole) ?? null);
+            const raw = profileData.approval_status as string | undefined;
+            setApprovalStatus(raw === 'pending' ? 'pending' : 'approved');
+          } else {
+            setRole(null);
+            setApprovalStatus(null);
+          }
         }
       } catch (err) {
         console.error('Auth initialization failed:', err);
+        if (!cancelled) {
+          setError('Authentication failed. Please try again.');
+        }
       } finally {
         initCompleted = true;
         clearTimeout(timeoutId);
         if (!cancelled) setLoading(false);
       }
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('clinic_os_active_clinic');
-        if (saved) setActiveClinicIdState(saved);
-      }
     };
+
     void init();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      try {
-        await refreshProfile(session?.user ?? null);
-      } catch (err) {
-        console.error('Profile refresh failed:', err);
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Only handle specific events
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (session?.user) {
+          setUser(session.user);
+          const profileData = await fetchProfileWithRetry(session.user.id);
+          if (profileData) {
+            setRole((profileData.role as UserRole) ?? null);
+            const raw = profileData.approval_status as string | undefined;
+            setApprovalStatus(raw === 'pending' ? 'pending' : 'approved');
+          }
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setRole(null);
+        setApprovalStatus(null);
+        setActiveClinicIdState(null);
+        setError(null);
       }
-      // Don't set loading false here - let the initial init() handle it
-      // Only update state, don't toggle loading flag
     });
 
     return () => {
       cancelled = true;
       subscription.unsubscribe();
     };
-  }, [refreshProfile]);
+  }, [retryCount, fetchProfileWithRetry]);
 
   useEffect(() => {
     if (role === 'doctor') {
@@ -201,13 +238,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser(null);
     setRole(null);
     setApprovalStatus(null);
+    setError(null);
   };
+
+  const retryInit = useCallback(() => {
+    setError(null);
+    setLoading(true);
+    setRetryCount(c => c + 1);
+  }, []);
 
   return (
     <AuthContext.Provider
-      value={{ 
-        user, role, approvalStatus, login, signup, logout, 
-        loading, language, activeClinicId, setActiveClinicId 
+      value={{
+        user, role, approvalStatus, login, signup, logout,
+        loading, language, activeClinicId, setActiveClinicId,
+        error, retryInit
       }}
     >
       {children}

@@ -3,9 +3,9 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { 
-  Users, UserPlus, FileBarChart, Settings, 
-  UserCheck, MapPin, Briefcase, Wallet, Search as UserSearch 
+import {
+  Users, UserPlus, FileBarChart, Settings,
+  UserCheck, MapPin, Briefcase, Wallet, Search as UserSearch, Share2
 } from 'lucide-react';
 
 import { useAuth } from '@/modules/auth/AuthContext';
@@ -38,6 +38,7 @@ export const Sidebar = () => {
     { label: isDoc ? 'Staff approvals' : 'موافقة الموظفين', href: '/approvals', icon: <UserCheck size={20} />, roles: ['doctor'] },
     { label: isDoc ? 'Clinical Workspace' : 'العيادة (Clinical)', href: '/clinical', icon: <UserPlus size={20} />, roles: ['doctor'] },
     { label: isDoc ? 'Performance & Analytics' : 'لأداء والتحليلات', href: '/analytics', icon: <FileBarChart size={20} />, roles: ['doctor', 'marketing'] },
+    { label: isDoc ? 'Marketing Dashboard' : 'لوحة التسويق', href: '/marketing', icon: <Share2 size={20} />, roles: ['doctor', 'marketing'] },
   ];
 
   const navItems = allNavItems.filter(item => item.roles.includes(role || ''));

@@ -4,9 +4,10 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   Clock, CheckCircle, UserPlus,
   Plus, X, Search, UserCheck, AlertCircle, Phone,
-  ArrowRight, User, MoreHorizontal, Crown
+  ArrowRight, User, MoreHorizontal, Crown, WifiOff
 } from 'lucide-react';
 import { useAuth } from '@/modules/auth/AuthContext';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { createClient } from '@/lib/supabase/client';
 import { getNextQueueNumber, callNextPatient, getWaitingPatients } from '@/lib/supabase/queue';
 import { validateQueueCheckIn, formatValidationErrors, sanitizePhoneNumber } from '@/lib/validation';
@@ -25,6 +26,8 @@ interface ExistingPatient {
 
 export default function QueuePage() {
   const { activeClinicId } = useAuth();
+  const isOnline = useNetworkStatus();
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Dynamic Config Data
   const [vTypes, setVTypes] = useState<any[]>([]);
@@ -80,22 +83,42 @@ export default function QueuePage() {
   }, [selVTypeId, clinicData, vTypes]);
 
   const loadData = useCallback(async () => {
-    const [pRes, qRes] = await Promise.all([
-      supabase.from('patients').select('*').order('created_at', { ascending: false }),
-      supabase.from('queue_entries')
-        .select('*, patients(*)')
-        .eq('clinic_id', activeClinicId)
-        .order('queue_num', { ascending: true }),
-    ]);
-    setPatients(pRes.data || []);
-    setQueue((qRes.data as QueueRow[]) || []);
-  }, [activeClinicId, supabase]);
+    if (!isOnline) {
+      setLoadError('You are offline. Queue data may be outdated.');
+      return;
+    }
+
+    setLoadError(null);
+
+    try {
+      const [pRes, qRes] = await Promise.all([
+        supabase.from('patients').select('*').order('created_at', { ascending: false }),
+        supabase.from('queue_entries')
+          .select('*, patients(*)')
+          .eq('clinic_id', activeClinicId)
+          .order('queue_num', { ascending: true }),
+      ]);
+
+      if (pRes.error) throw pRes.error;
+      if (qRes.error) throw qRes.error;
+
+      setPatients(pRes.data || []);
+      setQueue((qRes.data as QueueRow[]) || []);
+    } catch (error: any) {
+      console.error('Failed to load queue data:', error);
+      setLoadError('Failed to refresh queue. Check your connection.');
+    }
+  }, [activeClinicId, supabase, isOnline]);
 
   useEffect(() => {
     loadData();
-    const inv = setInterval(loadData, 10000);
-    return () => clearInterval(inv);
-  }, [loadData]);
+
+    // Only poll if online
+    if (isOnline) {
+      const inv = setInterval(loadData, 10000);
+      return () => clearInterval(inv);
+    }
+  }, [loadData, isOnline]);
 
   // Search for existing patients
   const searchExistingPatients = async (name: string, phone: string) => {
@@ -230,6 +253,23 @@ export default function QueuePage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      {/* Offline/Error Banner */}
+      {(!isOnline || loadError) && (
+        <div style={{
+          background: !isOnline ? '#df4759' : '#fff3cd',
+          color: !isOnline ? 'white' : '#856404',
+          padding: '12px 16px',
+          borderRadius: '8px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          fontWeight: 600
+        }}>
+          {!isOnline ? <WifiOff size={18} /> : <AlertCircle size={18} />}
+          {!isOnline ? 'You are offline. Queue data may be outdated.' : loadError}
+        </div>
+      )}
+
       <div className="card shadow-sm" style={{ borderLeft: '5px solid var(--primary)' }}>
          <div className="flex-between">
             <div>

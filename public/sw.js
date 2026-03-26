@@ -1,10 +1,47 @@
 // Clinic-OS Service Worker for PWA Support
-const CACHE_NAME = 'clinic-os-v2';
+// Version 3 with TTL support
+const CACHE_NAME = 'clinic-os-v3-20260326';
+const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 const STATIC_ASSETS = [
   '/manifest.json',
   '/icon-192x192.png',
   '/icon-512x512.png'
 ];
+
+// TTL-aware cache helpers
+const cacheWithTTL = {
+  async get(cache, request) {
+    const cached = await cache.match(request);
+    if (!cached) return null;
+
+    // Check TTL
+    const cachedTime = cached.headers.get('x-cached-time');
+    if (cachedTime) {
+      const age = Date.now() - parseInt(cachedTime, 10);
+      if (age > CACHE_TTL) {
+        // Stale, delete and return null
+        await cache.delete(request);
+        return null;
+      }
+    }
+
+    return cached;
+  },
+
+  async set(cache, request, response) {
+    // Clone response and add timestamp header
+    const headers = new Headers(response.headers);
+    headers.set('x-cached-time', Date.now().toString());
+
+    const cachedResponse = new Response(await response.clone().blob(), {
+      status: response.status,
+      statusText: response.statusText,
+      headers
+    });
+
+    await cache.put(request, cachedResponse);
+  }
+};
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -21,6 +58,7 @@ self.addEventListener('activate', event => {
         cacheNames.map(cacheName => {
           // Delete old caches
           if (cacheName !== CACHE_NAME) {
+            console.log('Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
@@ -42,6 +80,7 @@ self.addEventListener('fetch', event => {
   if (url.pathname.startsWith('/api/') ||
       url.pathname.includes('supabase') ||
       url.pathname.includes('auth') ||
+      url.host.includes('supabase') ||
       request.headers.get('Authorization')) {
     event.respondWith(fetch(request));
     return;
@@ -54,43 +93,43 @@ self.addEventListener('fetch', event => {
         .then(response => {
           // Cache successful responses
           if (response.status === 200) {
-            const responseClone = response.clone();
             caches.open(CACHE_NAME).then(cache => {
-              cache.put(request, responseClone);
+              cacheWithTTL.set(cache, request, response);
             });
           }
           return response;
         })
         .catch(() => {
-          // Network failed, try cache
-          return caches.match(request).then(cached => {
-            return cached || caches.match('/');
-          });
+          // Network failed, try cache with TTL
+          return caches.open(CACHE_NAME).then(cache =>
+            cacheWithTTL.get(cache, request).then(cached =>
+              cached || caches.match('/')
+            )
+          );
         })
     );
     return;
   }
 
-  // For static assets - cache first, fallback to network
+  // For static assets - cache first with TTL, fallback to network
   event.respondWith(
-    caches.match(request).then(cached => {
+    caches.open(CACHE_NAME).then(async cache => {
+      const cached = await cacheWithTTL.get(cache, request);
+
       if (cached) {
         // Return cache but update in background
         fetch(request).then(response => {
           if (response.status === 200) {
-            caches.open(CACHE_NAME).then(cache => {
-              cache.put(request, response);
-            });
+            cacheWithTTL.set(cache, request, response);
           }
         }).catch(() => {});
         return cached;
       }
+
+      // Not in cache or stale, fetch from network
       return fetch(request).then(response => {
         if (response.status === 200) {
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(request, responseClone);
-          });
+          cacheWithTTL.set(cache, request, response);
         }
         return response;
       });
