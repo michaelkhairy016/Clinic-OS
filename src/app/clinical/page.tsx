@@ -43,11 +43,19 @@ export default function ClinicalPage() {
   const [visitType, setVisitType] = useState('Consultation');
   const [selectedDiagnosisCategory, setSelectedDiagnosisCategory] = useState<string | null>(null);
   const [customDiagnosis, setCustomDiagnosis] = useState('');
+  const [severity, setSeverity] = useState<'mild' | 'moderate' | 'severe'>('moderate');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Get final diagnosis value
-  const diagnosis = selectedDiagnosisCategory === 'other' ? customDiagnosis : (selectedDiagnosisCategory || '');
+  // Get final diagnosis value with severity for certain conditions
+  const getDiagnosisWithSeverity = () => {
+    const baseDiagnosis = selectedDiagnosisCategory === 'other' ? customDiagnosis : (selectedDiagnosisCategory || '');
+    if ((selectedDiagnosisCategory === 'depression' || selectedDiagnosisCategory === 'anxiety') && severity) {
+      return `${baseDiagnosis} (${severity})`;
+    }
+    return baseDiagnosis;
+  };
+  const diagnosis = getDiagnosisWithSeverity();
 
   // Diagnosis categories for quick selection
   const diagnosisCategories = [
@@ -273,7 +281,7 @@ export default function ClinicalPage() {
     if (!activePatient) return alert('الرجاء اختيار مريض أولاً\n\nPlease select a patient first');
     if (prescription.length === 0) return alert('الرجاء إضافة أدوية للروشتة\n\nPlease add medications to the prescription');
     const docName = user?.user_metadata?.full_name || "Dr. Amgad Khairy Kamel";
-    generateRxPDF(activePatient, prescription, docName);
+    generateRxPDF(activePatient, prescription, docName, diagnosis);
   };
 
   const handleSelectAnotherPatient = () => {
@@ -401,8 +409,47 @@ export default function ClinicalPage() {
                 )}
                 {/* Show selected diagnosis */}
                 {selectedDiagnosisCategory && selectedDiagnosisCategory !== 'other' && (
-                  <div style={{ padding: '10px 14px', background: '#f0f7ff', borderRadius: '8px', fontSize: '0.9rem', color: 'var(--primary)', fontWeight: 600 }}>
+                  <div style={{ padding: '12px 16px', background: '#f0f7ff', borderRadius: '10px', fontSize: '0.9rem', color: 'var(--primary)', fontWeight: 600 }}>
                     Selected: {diagnosisCategories.find(d => d.key === selectedDiagnosisCategory)?.labelEn} / {diagnosisCategories.find(d => d.key === selectedDiagnosisCategory)?.labelAr}
+                  </div>
+                )}
+
+                {/* Severity Slider for Depression/Anxiety */}
+                {(selectedDiagnosisCategory === 'depression' || selectedDiagnosisCategory === 'anxiety') && (
+                  <div style={{ marginTop: '1rem', padding: '16px', background: '#fafafa', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                    <label style={{ display: 'block', fontWeight: 700, marginBottom: '12px', color: 'var(--text-medium)' }}>
+                      Severity Level / مستوى الشدة
+                    </label>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      {[
+                        { key: 'mild', labelEn: 'Mild', labelAr: 'بسيط', color: '#28a745' },
+                        { key: 'moderate', labelEn: 'Moderate', labelAr: 'متوسط', color: '#ffc107' },
+                        { key: 'severe', labelEn: 'Severe', labelAr: 'شديد', color: '#dc3545' }
+                      ].map(level => (
+                        <button
+                          key={level.key}
+                          type="button"
+                          onClick={() => setSeverity(level.key as any)}
+                          style={{
+                            flex: 1,
+                            padding: '12px 8px',
+                            border: severity === level.key ? `2px solid ${level.color}` : '1px solid var(--border)',
+                            borderRadius: '10px',
+                            background: severity === level.key ? level.color + '20' : 'white',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            textAlign: 'center'
+                          }}
+                        >
+                          <div style={{ fontWeight: 700, color: severity === level.key ? level.color : 'var(--text-dark)', marginBottom: '2px' }}>
+                            {level.labelEn}
+                          </div>
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text-light)' }}>
+                            {level.labelAr}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
                 {errors.diagnosis && <div style={{ color: '#df4759', fontSize: '0.85rem', marginTop: '4px' }}>{errors.diagnosis}</div>}

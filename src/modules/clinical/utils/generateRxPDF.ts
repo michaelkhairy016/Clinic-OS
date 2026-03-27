@@ -7,108 +7,180 @@ type RxDrug = {
   dose: string;
   frequency: string;
   duration: string;
-  trade_name_ar?: string; // Arabic trade name
+  trade_name_ar?: string;
 };
 
 /**
- * Generate Prescription PDF with Arabic Text Support
- * Uses basic font support for Arabic text rendering
+ * Generate Prescription PDF matching Dr. Amgad's template
+ * Based on Prescription PDF.pdf template
  */
-export const generateRxPDF = (patient: PatientRow, drugs: RxDrug[], doctorName: string = "Dr. Amgad Khairy Kamel") => {
+export const generateRxPDF = (
+  patient: PatientRow,
+  drugs: RxDrug[],
+  doctorName: string = "Dr. Amgad Khairy Kamel",
+  diagnosis: string = ""
+) => {
   const doc = new jsPDF();
+  const pageWidth = 210; // A4 width in mm
+  const margin = 20;
 
-  // 1. Header (Professional Branding)
-  doc.setTextColor(33, 94, 92); // var(--primary)
-  doc.setFontSize(22);
-  doc.text(doctorName, 105, 20, { align: 'center' });
-  doc.setFontSize(14);
-  doc.text("Clinic-OS Medical Prescription", 105, 30, { align: 'center' });
-
-  doc.setDrawColor(226, 235, 235);
-  doc.line(20, 35, 190, 35);
-
-  // 2. Patient Info Section
-  doc.setTextColor(26, 51, 50); // var(--text-dark)
-  doc.setFontSize(12);
-  doc.text(`Patient: ${patient.full_name}`, 20, 45);
-  doc.text(`Age: ${patient.age || 'N/A'}`, 120, 45);
-  doc.text(`Code: ${patient.patient_code}`, 20, 52);
-  doc.text(`Date: ${new Date().toLocaleDateString()}`, 120, 52);
-
-  doc.line(20, 58, 190, 58);
-
-  // 3. The Rx List
+  // ========== HEADER ==========
+  // Doctor Name - centered, large
+  doc.setTextColor(0, 0, 0);
   doc.setFontSize(18);
-  doc.text("Rx", 20, 70);
+  doc.setFont('helvetica', 'bold');
+  doc.text(doctorName, pageWidth / 2, 18, { align: 'center' });
 
-  let currentY = 80;
+  // Credentials
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'normal');
+  doc.text("M.B.B.Ch, M.Sc. Psychiatry", pageWidth / 2, 26, { align: 'center' });
+
+  // Address
+  doc.setFontSize(10);
+  doc.text("250 Teraa Elbolakya St., Shoubra, Cairo", pageWidth / 2, 33, { align: 'center' });
+
+  // Phone numbers
+  doc.setTextColor(80, 80, 80);
+  doc.text("Tel: 0100 100 6013 / 0122 326 1827", pageWidth / 2, 40, { align: 'center' });
+
+  // Decorative line under header
+  doc.setDrawColor(0, 100, 100);
+  doc.setLineWidth(0.5);
+  doc.line(margin, 45, pageWidth - margin, 45);
+
+  // ========== PATIENT INFO ==========
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'normal');
+
+  // Date - right aligned
+  const today = new Date();
+  const dateStr = today.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+  doc.text(`Date: ${dateStr}`, pageWidth - margin, 55, { align: 'right' });
+
+  // Patient Name
+  doc.setFont('helvetica', 'bold');
+  doc.text("Patient Name:", margin, 55);
+  doc.setFont('helvetica', 'normal');
+  doc.text(patient.full_name, margin + 35, 55);
+
+  // Patient Code and Age
+  doc.text(`Code: ${patient.patient_code}`, margin, 63);
+  doc.text(`Age: ${patient.age || 'N/A'} years`, margin + 50, 63);
+
+  // ========== DIAGNOSIS ==========
+  if (diagnosis) {
+    doc.setFont('helvetica', 'bold');
+    doc.text("Diagnosis:", margin, 73);
+    doc.setFont('helvetica', 'normal');
+    const diagnosisText = diagnosis.substring(0, 60); // Limit length
+    doc.text(diagnosisText, margin + 28, 73);
+  }
+
+  // Line before Rx
+  doc.setDrawColor(150, 150, 150);
+  doc.setLineWidth(0.2);
+  doc.line(margin, 80, pageWidth - margin, 80);
+
+  // ========== Rx PRESCRIPTION AREA ==========
+  // Rx symbol
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(0, 0, 0);
+  doc.text("R/", margin, 92);
+
+  // Prescription items with ruled lines
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'normal');
+
+  let currentY = 100;
+  const lineHeight = 18;
+  const leftCol = margin + 5;
+
   drugs.forEach((drug, index) => {
-    // Medication Name (English)
-    doc.setFontSize(12);
-    doc.setTextColor(33, 94, 92);
-    doc.text(`${index + 1}. ${drug.trade_name} (${drug.generic_name})`, 25, currentY);
+    // Drug number and name
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 80, 80);
+    doc.text(`${index + 1}.`, leftCol, currentY);
+    doc.text(drug.trade_name, leftCol + 8, currentY);
 
-    // Instruction - using Arabic labels from frequency dictionary
-    doc.setTextColor(74, 102, 101);
+    // Generic name in parentheses
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 100, 100);
+    doc.setFontSize(9);
+    doc.text(`(${drug.generic_name})`, leftCol + 8 + doc.getTextWidth(drug.trade_name) + 3, currentY);
+
+    // Dosage instruction line
     doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    const instruction = `${drug.dose} - ${formatFrequency(drug.frequency)} - ${drug.duration}`;
+    doc.text(instruction, leftCol + 12, currentY + 7);
 
-    // Format frequency in both Arabic and English
-    const frequencyText = formatFrequency(drug.frequency);
-    doc.text(`Dosage: ${drug.dose} --- ${frequencyText} --- Duration: ${drug.duration}`, 30, currentY + 7);
+    // Ruled line under each drug
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.1);
+    doc.line(leftCol, currentY + 12, pageWidth - margin, currentY + 12);
 
-    currentY += 20;
+    currentY += lineHeight;
 
     // Check for page overflow
-    if (currentY > 270) {
+    if (currentY > 250) {
       doc.addPage();
-      currentY = 20;
+      currentY = 30;
     }
   });
 
-  // 4. Footer with Arabic support
-  doc.setFontSize(10);
-  doc.setTextColor(143, 166, 165);
-  doc.text("This is an electronically generated prescription. No signature required.", 105, 285, { align: 'center' });
-  doc.text("Powered by Clinic-OS | وصفة طبية", 105, 290, { align: 'center' });
-
-  // Save PDF
-  doc.save(`Rx_${patient.patient_code}_${new Date().getTime()}.pdf`);
-};
-
-/**
- * Format frequency with Arabic translation
- * Maps English frequency codes to Arabic labels
- */
-const formatFrequency = (frequency: string): string => {
-  const frequencyMap: Record<string, { ar: string; en: string }> = {
-    'OD': { ar: 'مرة يومياً', en: 'Once daily' },
-    'BD': { ar: 'مرتين يومياً', en: 'Twice daily' },
-    'TDS': { ar: 'ثلاث مرات يومياً', en: 'Three times daily' },
-    'QDS': { ar: 'أربع مرات يومياً', en: 'Four times daily' },
-    'PRN': { ar: 'عند الحاجة', en: 'As needed' },
-    'QID': { ar: 'كل 6 ساعات', en: 'Every 6 hours' },
-    'Q4H': { ar: 'كل 4 ساعات', en: 'Every 4 hours' },
-    'HS': { ar: 'وقت النوم', en: 'At bedtime' },
-    'AC': { ar: 'قبل الأكل', en: 'Before meals' },
-    'PC': { ar: 'بعد الأكل', en: 'After meals' },
-  };
-
-  // Check if frequency is a standard code
-  const standardFreq = frequencyMap[frequency.toUpperCase()];
-  if (standardFreq) {
-    return `${standardFreq.en} (${standardFreq.ar})`;
+  // Empty ruled lines for writing
+  const emptyLines = Math.max(3, 8 - drugs.length);
+  for (let i = 0; i < emptyLines; i++) {
+    doc.setDrawColor(220, 220, 220);
+    doc.line(leftCol, currentY, pageWidth - margin, currentY);
+    currentY += 8;
   }
 
-  // If it's a custom frequency, return as-is
-  return frequency;
+  // ========== SIGNATURE AREA ==========
+  // Signature line at bottom right
+  const sigY = 270;
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.3);
+  doc.line(pageWidth - 70, sigY, pageWidth - margin, sigY);
+  doc.setFontSize(9);
+  doc.setTextColor(100, 100, 100);
+  doc.text("Signature", pageWidth - margin - 25, sigY + 5);
+
+  // Footer
+  doc.setFontSize(8);
+  doc.setTextColor(150, 150, 150);
+  doc.text("Generated by Clinic-OS", pageWidth / 2, 287, { align: 'center' });
+
+  // Save PDF
+  const fileName = `Rx_${patient.patient_code}_${today.getTime()}.pdf`;
+  doc.save(fileName);
+
+  return fileName;
 };
 
 /**
- * Alternative: Simple Arabic text rendering note
- * For better Arabic support, consider using:
- * - jspdf-autotable for RTL tables
- * - Custom Arabic font files loaded into jsPDF
- * - PDF-lib or react-pdf libraries with better RTL support
- *
- * Current implementation provides basic Arabic labels alongside English
+ * Format frequency with readable text
  */
+const formatFrequency = (frequency: string): string => {
+  const frequencyMap: Record<string, string> = {
+    'OD': 'Once daily',
+    'BID': 'Twice daily',
+    'TID': '3x daily',
+    'QID': '4x daily',
+    'QHS': 'At bedtime',
+    'QOD': 'Every other day',
+    'PRN': 'As needed',
+    'AC': 'Before meals',
+    'PC': 'After meals',
+    'STAT': 'Immediately',
+  };
+
+  return frequencyMap[frequency.toUpperCase()] || frequency;
+};

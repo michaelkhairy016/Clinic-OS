@@ -14,21 +14,33 @@ type Medication = {
 
 type Frequency = {
   id: string;
-  code_en: string;
-  label_ar: string;
+  phrase_en: string;
+  phrase_ar: string;
+};
+
+type Titration = {
+  id: string;
+  medication_name: string;
+  start_dose: string;
+  target_dose: string;
+  increment_step: string;
+  days_per_step: number;
+  notes: string;
 };
 
 export default function MasterLibrary() {
   const [activeTab, setActiveTab] = useState<'medications' | 'frequencies' | 'titrations'>('medications');
   const [meds, setMeds] = useState<Medication[]>([]);
   const [freqs, setFreqs] = useState<Frequency[]>([]);
+  const [titrations, setTitrations] = useState<Titration[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Form State
   const [showAddModal, setShowAddModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [newMed, setNewMed] = useState({ trade_name_en: '', generic_name_en: '', category: '', dose_form: 'Pill' });
-  const [newFreq, setNewFreq] = useState({ code_en: '', label_ar: '' });
+  const [newFreq, setNewFreq] = useState({ phrase_en: '', phrase_ar: '' });
+  const [newTitration, setNewTitration] = useState({ medication_name: '', start_dose: '', target_dose: '', increment_step: '', days_per_step: 7, notes: '' });
 
   const supabase = createClient();
 
@@ -39,8 +51,11 @@ export default function MasterLibrary() {
         const { data } = await supabase.from('medication_master').select('*').order('trade_name_en');
         setMeds(data || []);
       } else if (activeTab === 'frequencies') {
-        const { data } = await supabase.from('frequency_dictionary').select('*').order('code_en');
+        const { data } = await supabase.from('frequency_dictionary').select('*').order('phrase_en');
         setFreqs(data || []);
+      } else if (activeTab === 'titrations') {
+        const { data } = await supabase.from('titration_protocols').select('*').order('medication_name');
+        setTitrations(data || []);
       }
     } catch (err) {
       console.error('Fetch error:', err);
@@ -73,7 +88,23 @@ export default function MasterLibrary() {
     if (error) alert(error.message);
     else {
       setShowAddModal(false);
-      setNewFreq({ code_en: '', label_ar: '' });
+      setNewFreq({ phrase_en: '', phrase_ar: '' });
+      fetchData();
+    }
+    setIsSubmitting(false);
+  };
+
+  const handleAddTitration = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    const { error } = await supabase.from('titration_protocols').insert({
+      ...newTitration,
+      days_per_step: Number(newTitration.days_per_step)
+    });
+    if (error) alert(error.message);
+    else {
+      setShowAddModal(false);
+      setNewTitration({ medication_name: '', start_dose: '', target_dose: '', increment_step: '', days_per_step: 7, notes: '' });
       fetchData();
     }
     setIsSubmitting(false);
@@ -102,7 +133,7 @@ export default function MasterLibrary() {
           {activeTab === 'medications' ? 'Medications Inventory' : activeTab === 'frequencies' ? 'Frequency Dictionary' : 'Titration Logic'}
         </h3>
         <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
-          <Plus size={16} /> {activeTab === 'medications' ? 'Add Medication' : 'Add Frequency'}
+          <Plus size={16} /> {activeTab === 'medications' ? 'Add Medication' : activeTab === 'frequencies' ? 'Add Frequency' : 'Add Titration'}
         </button>
       </div>
 
@@ -123,10 +154,18 @@ export default function MasterLibrary() {
                   <th style={{ textAlign: 'left' }}>Form</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
-              ) : (
+              ) : activeTab === 'frequencies' ? (
                 <tr>
                   <th style={{ textAlign: 'left' }}>Code (EN)</th>
                   <th style={{ textAlign: 'left' }}>Label (AR)</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
+                </tr>
+              ) : (
+                <tr>
+                  <th style={{ textAlign: 'left' }}>Medication</th>
+                  <th style={{ textAlign: 'left' }}>Start → Target</th>
+                  <th style={{ textAlign: 'left' }}>Increment</th>
+                  <th style={{ textAlign: 'left' }}>Days/Step</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               )}
@@ -147,10 +186,23 @@ export default function MasterLibrary() {
               ))}
               {activeTab === 'frequencies' && freqs.map(freq => (
                 <tr key={freq.id}>
-                  <td style={{ fontWeight: 800 }}>{freq.code_en}</td>
-                  <td dir="rtl" style={{ fontSize: '1.1rem' }}>{freq.label_ar}</td>
+                  <td style={{ fontWeight: 800 }}>{freq.phrase_en}</td>
+                  <td dir="rtl" style={{ fontSize: '1.1rem' }}>{freq.phrase_ar}</td>
                   <td style={{ textAlign: 'right' }}>
                     <button className="btn btn-ghost" style={{ color: '#df4759' }} onClick={() => handleDelete('frequency_dictionary', freq.id)}>
+                      <Trash2 size={16} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {activeTab === 'titrations' && titrations.map(tit => (
+                <tr key={tit.id}>
+                  <td style={{ fontWeight: 600, color: 'var(--primary)' }}>{tit.medication_name}</td>
+                  <td>{tit.start_dose} → {tit.target_dose}</td>
+                  <td>{tit.increment_step}</td>
+                  <td>{tit.days_per_step} days</td>
+                  <td style={{ textAlign: 'right' }}>
+                    <button className="btn btn-ghost" style={{ color: '#df4759' }} onClick={() => handleDelete('titration_protocols', tit.id)}>
                       <Trash2 size={16} />
                     </button>
                   </td>
@@ -164,12 +216,12 @@ export default function MasterLibrary() {
       {/* Basic Add Modal */}
       {showAddModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem' }}>
-          <div className="card" style={{ width: '100%', maxWidth: '400px', marginBottom: 0 }}>
+          <div className="card" style={{ width: '100%', maxWidth: '500px', marginBottom: 0 }}>
             <div className="flex-between">
-              <h3>{activeTab === 'medications' ? 'New Medication' : 'New Frequency'}</h3>
+              <h3>{activeTab === 'medications' ? 'New Medication' : activeTab === 'frequencies' ? 'New Frequency' : 'New Titration Protocol'}</h3>
               <button className="btn btn-ghost" onClick={() => setShowAddModal(false)}><X size={20}/></button>
             </div>
-            
+
             {activeTab === 'medications' ? (
               <form onSubmit={handleAddMed} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <input placeholder="Trade Name (e.g. Cipralex)" value={newMed.trade_name_en} onChange={e => setNewMed({...newMed, trade_name_en: e.target.value})} required className="btn" style={{ border: '1px solid var(--border)', textAlign: 'left' }} />
@@ -184,12 +236,28 @@ export default function MasterLibrary() {
                    {isSubmitting ? 'Saving...' : 'Add to Library'}
                 </button>
               </form>
-            ) : (
+            ) : activeTab === 'frequencies' ? (
               <form onSubmit={handleAddFreq} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <input placeholder="Code (e.g. OD)" value={newFreq.code_en} onChange={e => setNewFreq({...newFreq, code_en: e.target.value})} required className="btn" style={{ border: '1px solid var(--border)', textAlign: 'left' }} />
-                <input dir="rtl" placeholder="الاسم (مثلاً: مرة يومياً)" value={newFreq.label_ar} onChange={e => setNewFreq({...newFreq, label_ar: e.target.value})} required className="btn" style={{ border: '1px solid var(--border)', textAlign: 'right' }} />
+                <input placeholder="Code (e.g. OD)" value={newFreq.phrase_en} onChange={e => setNewFreq({...newFreq, phrase_en: e.target.value})} required className="btn" style={{ border: '1px solid var(--border)', textAlign: 'left' }} />
+                <input dir="rtl" placeholder="الاسم (مثلاً: مرة يومياً)" value={newFreq.phrase_ar} onChange={e => setNewFreq({...newFreq, phrase_ar: e.target.value})} required className="btn" style={{ border: '1px solid var(--border)', textAlign: 'right' }} />
                 <button disabled={isSubmitting} className="btn btn-primary" style={{ marginTop: '1rem' }}>
                    {isSubmitting ? 'Saving...' : 'Add to Library'}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleAddTitration} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <input placeholder="Medication Name (e.g. Cipralex)" value={newTitration.medication_name} onChange={e => setNewTitration({...newTitration, medication_name: e.target.value})} required className="btn" style={{ border: '1px solid var(--border)', textAlign: 'left' }} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <input placeholder="Start Dose (5mg)" value={newTitration.start_dose} onChange={e => setNewTitration({...newTitration, start_dose: e.target.value})} required className="btn" style={{ border: '1px solid var(--border)', textAlign: 'left' }} />
+                  <input placeholder="Target Dose (20mg)" value={newTitration.target_dose} onChange={e => setNewTitration({...newTitration, target_dose: e.target.value})} required className="btn" style={{ border: '1px solid var(--border)', textAlign: 'left' }} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <input placeholder="Increment (5mg)" value={newTitration.increment_step} onChange={e => setNewTitration({...newTitration, increment_step: e.target.value})} required className="btn" style={{ border: '1px solid var(--border)', textAlign: 'left' }} />
+                  <input type="number" placeholder="Days per Step" value={newTitration.days_per_step} onChange={e => setNewTitration({...newTitration, days_per_step: Number(e.target.value)})} required className="btn" style={{ border: '1px solid var(--border)', textAlign: 'left' }} />
+                </div>
+                <textarea placeholder="Notes (optional)" value={newTitration.notes} onChange={e => setNewTitration({...newTitration, notes: e.target.value})} className="btn" style={{ border: '1px solid var(--border)', textAlign: 'left', minHeight: '60px' }} />
+                <button disabled={isSubmitting} className="btn btn-primary" style={{ marginTop: '1rem' }}>
+                   {isSubmitting ? 'Saving...' : 'Add Titration Protocol'}
                 </button>
               </form>
             )}
