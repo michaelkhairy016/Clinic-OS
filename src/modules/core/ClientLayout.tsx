@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from '@/modules/auth/AuthContext';
 import { Sidebar } from './Sidebar';
 import { usePathname } from 'next/navigation';
 import { LogOut, AlertCircle, RefreshCw, WifiOff } from 'lucide-react';
+import { Toaster } from 'sonner';
 
 import { LoginScreen } from '@/modules/auth/LoginScreen';
 import { SetupSupabase } from '@/modules/auth/SetupSupabase';
@@ -134,6 +135,19 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <div className={`app-container ${isRTL ? 'dir-rtl' : 'dir-ltr'}`}>
+      {/* Toast Notifications */}
+      <Toaster
+        position={isRTL ? "top-left" : "top-right"}
+        toastOptions={{
+          duration: 4000,
+          style: {
+            fontFamily: 'inherit',
+          },
+        }}
+        richColors
+        closeButton
+      />
+
       {/* Offline Banner */}
       {!isOnline && (
         <div style={{

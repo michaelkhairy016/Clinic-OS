@@ -95,14 +95,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     let cancelled = false;
     let initCompleted = false;
 
-    // Reduced timeout with error state
+    // Shorter timeout (5 seconds) with auto-clear
     const timeoutId = setTimeout(() => {
       if (!cancelled && !initCompleted) {
-        console.warn('Auth initialization timed out');
-        setError('Connection timeout. Please check your network and try again.');
+        console.warn('Auth initialization timed out - clearing cookies');
+        // Auto-clear storage on timeout
+        if (typeof window !== 'undefined') {
+          localStorage.clear();
+          sessionStorage.clear();
+        }
+        setError('Connection timeout. Please refresh or clear cookies.');
         setLoading(false);
       }
-    }, 8000);
+    }, 5000);
 
     const init = async () => {
       try {
@@ -110,7 +115,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         const {
           data: { user: u },
+          error: userError,
         } = await supabase.auth.getUser();
+
+        // If there's an auth error, clear cookies and reset
+        if (userError) {
+          console.warn('Auth error, clearing session:', userError.message);
+          if (typeof window !== 'undefined') {
+            localStorage.clear();
+            sessionStorage.clear();
+          }
+          if (!cancelled) {
+            setUser(null);
+            setRole(null);
+            setApprovalStatus(null);
+          }
+          return;
+        }
 
         if (cancelled) return;
 
@@ -132,7 +153,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } catch (err) {
         console.error('Auth initialization failed:', err);
         if (!cancelled) {
-          setError('Authentication failed. Please try again.');
+          // Clear storage on error
+          if (typeof window !== 'undefined') {
+            localStorage.clear();
+            sessionStorage.clear();
+          }
+          setError('Authentication error. Please refresh the page.');
         }
       } finally {
         initCompleted = true;
@@ -163,6 +189,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setApprovalStatus(null);
         setActiveClinicIdState(null);
         setError(null);
+        // Clear session storage on sign out
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('clinic_os_active_clinic');
+        }
       }
     });
 
@@ -232,40 +262,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const logout = async () => {
-    if (!isSupabaseConfigured()) return;
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    // Clear local state immediately
     setUser(null);
     setRole(null);
     setApprovalStatus(null);
     setError(null);
+    setActiveClinicIdState(null);
 
-    // NUKE: Clear all caches and storage on logout
     if (typeof window !== 'undefined') {
-      // Tell service worker to clear caches
-      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage('CLEAR_ALL_CACHES');
-      }
+      // Clear storage first
+      localStorage.clear();
+      sessionStorage.clear();
 
-      // Unregister all service workers
+      // Clear service workers
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(registrations => {
           registrations.forEach(reg => reg.unregister());
         });
       }
 
-      // Clear all CacheStorage
+      // Clear caches
       if ('caches' in window) {
         caches.keys().then(names => {
           names.forEach(name => caches.delete(name));
         });
       }
 
-      // Clear all browser storage
-      localStorage.clear();
-      sessionStorage.clear();
+      // Call server logout in background (don't wait)
+      fetch('/auth/logout', { method: 'POST' }).catch(() => {});
 
-      // Force hard reload to login
+      // Also try client-side signout
+      if (isSupabaseConfigured()) {
+        const supabase = createClient();
+        supabase.auth.signOut().catch(() => {});
+      }
+
+      // Redirect to home immediately
       window.location.href = '/';
     }
   };
