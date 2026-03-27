@@ -56,10 +56,12 @@ export default function QueuePage() {
 
   useEffect(() => {
     const fetchConfig = async () => {
+      if (!activeClinicId) return;
+
       const [vRes, pRes, cRes] = await Promise.all([
         supabase.from('visit_types').select('*').order('name_ar'),
         supabase.from('payment_methods').select('*').order('name_ar'),
-        supabase.from('clinics').select('*').eq('id', activeClinicId).single()
+        supabase.from('clinics').select('*').eq('id', activeClinicId).maybeSingle()
       ]);
       setVTypes(vRes.data || []);
       setPMethods(pRes.data || []);
@@ -83,6 +85,11 @@ export default function QueuePage() {
   }, [selVTypeId, clinicData, vTypes]);
 
   const loadData = useCallback(async () => {
+    // Don't load without a clinic selected
+    if (!activeClinicId) {
+      return;
+    }
+
     if (!isOnline) {
       setLoadError('You are offline. Queue data may be outdated.');
       return;
