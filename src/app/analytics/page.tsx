@@ -50,10 +50,20 @@ export default function AnalyticsPage() {
   const [satisfactionScores, setSatisfactionScores] = useState<SatisfactionScore[]>([]);
   const [averageRating, setAverageRating] = useState(0);
   const [showSatisfactionModal, setShowSatisfactionModal] = useState(false);
+  const [feedbackPatientId, setFeedbackPatientId] = useState('');
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [feedbackSource, setFeedbackSource] = useState<'in_person' | 'phone' | 'vezeeta'>('in_person');
+  const [patients, setPatients] = useState<PatientRow[]>([]);
 
   // Marketing Campaigns
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [showCampaignModal, setShowCampaignModal] = useState(false);
+  const [campaignName, setCampaignName] = useState('');
+  const [campaignType, setCampaignType] = useState<'social' | 'vezeeta' | 'referral'>('social');
+  const [campaignMessage, setCampaignMessage] = useState('');
+  const [campaignStartDate, setCampaignStartDate] = useState('');
+  const [campaignEndDate, setCampaignEndDate] = useState('');
 
   // Follow-up Management
   const [followUps, setFollowUps] = useState<any[]>([]);
@@ -137,19 +147,6 @@ export default function AnalyticsPage() {
       setTopReferralSources(referralArray.slice(0, 5));
     };
 
-    // Load satisfaction scores (simulated data for demo)
-    useEffect(() => {
-      const scores: SatisfactionScore[] = [
-        { patient: 'Ahmed Mohamed', patient_code: 'P-1001', rating: 5, date: '2024-03-20', feedback: 'Excellent service, very satisfied' },
-        { patient: 'Fatima Ali', patient_code: 'P-1002', rating: 5, date: '2024-03-19', feedback: 'Good experience, professional doctor' },
-        { patient: 'Omar Hassan', patient_code: 'P-1003', rating: 4, date: '2024-03-18', feedback: 'Great improvement, friendly staff' },
-        { patient: 'Layla Mahmoud', patient_code: 'P-1004', rating: 3, date: '2024-03-17', feedback: 'Average wait time, but good treatment' },
-        { patient: 'Mohamed Ali', patient_code: 'P-1005', rating: 5, date: '2024-03-15', feedback: 'Excellent care and follow-up' }
-      ];
-      setSatisfactionScores(scores);
-      setAverageRating(Number((scores.reduce((sum, s) => sum + s.rating, 0) / scores.length).toFixed(1)));
-    }, []);
-
     // Follow-ups
     const fetchFollowUps = async () => {
       const { data } = await supabase
@@ -174,12 +171,55 @@ export default function AnalyticsPage() {
       setCampaigns(data || []);
     };
 
+    // Satisfaction scores
+    const fetchSatisfactionScores = async () => {
+      const { data, error } = await supabase
+        .from('satisfaction_scores')
+        .select('*, patients(full_name, patient_code)')
+        .eq('clinic_id', activeClinicId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) {
+        console.error('Error fetching satisfaction scores:', error);
+        return;
+      }
+
+      const formattedData = (data || []).map(score => ({
+        id: score.id,
+        patient: score.patients?.full_name || 'Anonymous',
+        patient_code: score.patients?.patient_code || '',
+        rating: score.rating,
+        date: score.created_at,
+        feedback: score.feedback || ''
+      }));
+
+      setSatisfactionScores(formattedData);
+      if (formattedData.length > 0) {
+        setAverageRating(Number((formattedData.reduce((sum, s) => sum + s.rating, 0) / formattedData.length).toFixed(1)));
+      }
+    };
+
     fetchAnalytics();
     fetchRevenueStats();
     fetchReferralStats();
     fetchFollowUps();
     fetchCampaigns();
+    fetchSatisfactionScores();
   }, [activeClinicId, supabase]);
+
+  // Load patients for feedback selection
+  useEffect(() => {
+    const fetchPatients = async () => {
+      const { data } = await supabase
+        .from('patients')
+        .select('*')
+        .order('full_name')
+        .limit(100);
+      setPatients(data || []);
+    };
+    fetchPatients();
+  }, [supabase]);
 
   const handleScheduleFollowUp = async () => {
     if (!selectedPatient || !activeClinicId) return;
@@ -207,6 +247,104 @@ export default function AnalyticsPage() {
     } catch (error: any) {
       console.error('Error scheduling follow-up:', error);
       alert('خطأ في جدار المتابعة: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCollectFeedback = async () => {
+    if (!feedbackPatientId || !feedbackRating) {
+      alert('Please select a patient and rating\n\nالرجاء اختيار المريض والتقييم');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('satisfaction_scores').insert({
+        patient_id: feedbackPatientId,
+        rating: feedbackRating,
+        feedback: feedbackText,
+        source: feedbackSource,
+        clinic_id: activeClinicId
+      });
+
+      if (error) throw error;
+
+      // Refresh satisfaction scores
+      const { data: updatedScores } = await supabase
+        .from('satisfaction_scores')
+        .select('*, patients(full_name, patient_code)')
+        .eq('clinic_id', activeClinicId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (updatedScores) {
+        const formattedData = updatedScores.map(score => ({
+          id: score.id,
+          patient: score.patients?.full_name || 'Anonymous',
+          patient_code: score.patients?.patient_code || '',
+          rating: score.rating,
+          date: score.created_at,
+          feedback: score.feedback || ''
+        }));
+        setSatisfactionScores(formattedData);
+        if (formattedData.length > 0) {
+          setAverageRating(Number((formattedData.reduce((sum, s) => sum + s.rating, 0) / formattedData.length).toFixed(1)));
+        }
+      }
+
+      setShowSatisfactionModal(false);
+      setFeedbackPatientId('');
+      setFeedbackRating(5);
+      setFeedbackText('');
+      alert('تم تسجيل التقييم بنجاح!\n\nFeedback recorded successfully!');
+    } catch (error: any) {
+      console.error('Error collecting feedback:', error);
+      alert('خطأ في تسجيل التقييم: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateCampaign = async () => {
+    if (!campaignName || !campaignMessage) {
+      alert('Please fill in all required fields\n\nالرجاء ملء جميع الحقول المطلوبة');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('marketing_campaigns').insert({
+        name: campaignName,
+        type: campaignType,
+        message: campaignMessage,
+        start_date: campaignStartDate,
+        end_date: campaignEndDate,
+        clinic_id: activeClinicId,
+        status: 'active'
+      });
+
+      if (error) throw error;
+
+      // Refresh campaigns list
+      const { data: updatedCampaigns } = await supabase
+        .from('marketing_campaigns')
+        .select('*')
+        .eq('clinic_id', activeClinicId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      setCampaigns(updatedCampaigns || []);
+
+      setShowCampaignModal(false);
+      setCampaignName('');
+      setCampaignMessage('');
+      setCampaignStartDate('');
+      setCampaignEndDate('');
+      alert('تم إنشاء الحملة بنجاح!\n\nCampaign created successfully!');
+    } catch (error: any) {
+      console.error('Error creating campaign:', error);
+      alert('خطأ في إنشاء الحملة: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -617,6 +755,162 @@ export default function AnalyticsPage() {
                 disabled={loading}
                 style={{ padding: '1.2rem', fontSize: '1.1rem' }}
               >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Satisfaction Feedback Modal */}
+      {showSatisfactionModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="card shadow-lg" style={{ maxWidth: 500, width: '100%', padding: '2rem', borderRadius: '24px' }}>
+            <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
+              <h2 style={{ color: 'var(--primary)', margin: 0, fontWeight: 800 }}>Collect Feedback</h2>
+              <button onClick={() => setShowSatisfactionModal(false)}><X size={24} /></button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: 800, marginBottom: '8px' }}>
+                  Select Patient / اختيار المريض *
+                </label>
+                <select
+                  value={feedbackPatientId}
+                  onChange={e => setFeedbackPatientId(e.target.value)}
+                  style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid var(--border)', fontSize: '1rem' }}
+                >
+                  <option value="">-- Select Patient --</option>
+                  {patients.map(p => (
+                    <option key={p.id} value={p.id}>{p.full_name} ({p.patient_code})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontWeight: 800, marginBottom: '12px' }}>
+                  Rating / التقييم *
+                </label>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                  {[1, 2, 3, 4, 5].map(rating => (
+                    <button
+                      key={rating}
+                      type="button"
+                      onClick={() => setFeedbackRating(rating)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+                    >
+                      <Star
+                        size={32}
+                        fill={rating <= feedbackRating ? getRatingColor(feedbackRating) : '#e9ecef'}
+                        style={{ color: rating <= feedbackRating ? getRatingColor(feedbackRating) : '#e9ecef' }}
+                      />
+                    </button>
+                  ))}
+                </div>
+                <div style={{ textAlign: 'center', marginTop: '8px', fontWeight: 600, color: getRatingColor(feedbackRating) }}>
+                  {feedbackRating} Star{feedbackRating !== 1 ? 's' : ''}
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontWeight: 800, marginBottom: '8px' }}>
+                  Feedback Notes / ملاحظات
+                </label>
+                <textarea
+                  value={feedbackText}
+                  onChange={e => setFeedbackText(e.target.value)}
+                  rows={3}
+                  placeholder="Patient feedback or comments..."
+                  style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid var(--border)', fontSize: '1rem', fontFamily: 'inherit' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+              <button className="btn btn-primary" onClick={handleCollectFeedback} disabled={loading} style={{ flex: 1, padding: '1.2rem', fontSize: '1.1rem', fontWeight: 800 }}>
+                {loading ? 'Saving...' : <><Star size={20} /> Save Feedback</>}
+              </button>
+              <button className="btn btn-secondary" onClick={() => setShowSatisfactionModal(false)} disabled={loading} style={{ padding: '1.2rem', fontSize: '1.1rem' }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Campaign Modal */}
+      {showCampaignModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="card shadow-lg" style={{ maxWidth: 500, width: '100%', padding: '2rem', borderRadius: '24px' }}>
+            <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
+              <h2 style={{ color: 'var(--primary)', margin: 0, fontWeight: 800 }}>Create Campaign</h2>
+              <button onClick={() => setShowCampaignModal(false)}><X size={24} /></button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: 800, marginBottom: '8px' }}>Campaign Name *</label>
+                <input
+                  type="text"
+                  value={campaignName}
+                  onChange={e => setCampaignName(e.target.value)}
+                  placeholder="e.g., Spring Campaign"
+                  style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid var(--border)', fontSize: '1rem' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontWeight: 800, marginBottom: '8px' }}>Campaign Type *</label>
+                <select
+                  value={campaignType}
+                  onChange={e => setCampaignType(e.target.value as any)}
+                  style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid var(--border)', fontSize: '1rem' }}
+                >
+                  <option value="social">Social Media</option>
+                  <option value="vezeeta">Vezeeta Platform</option>
+                  <option value="referral">Referral Program</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontWeight: 800, marginBottom: '8px' }}>Message *</label>
+                <textarea
+                  value={campaignMessage}
+                  onChange={e => setCampaignMessage(e.target.value)}
+                  rows={3}
+                  placeholder="Campaign message..."
+                  style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid var(--border)', fontSize: '1rem', fontFamily: 'inherit' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontWeight: 800, marginBottom: '8px' }}>Start Date</label>
+                  <input
+                    type="date"
+                    value={campaignStartDate}
+                    onChange={e => setCampaignStartDate(e.target.value)}
+                    style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid var(--border)', fontSize: '1rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontWeight: 800, marginBottom: '8px' }}>End Date</label>
+                  <input
+                    type="date"
+                    value={campaignEndDate}
+                    onChange={e => setCampaignEndDate(e.target.value)}
+                    style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid var(--border)', fontSize: '1rem' }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+              <button className="btn btn-primary" onClick={handleCreateCampaign} disabled={loading} style={{ flex: 1, padding: '1.2rem', fontSize: '1.1rem', fontWeight: 800 }}>
+                {loading ? 'Creating...' : <><Plus size={20} /> Create Campaign</>}
+              </button>
+              <button className="btn btn-secondary" onClick={() => setShowCampaignModal(false)} disabled={loading} style={{ padding: '1.2rem', fontSize: '1.1rem' }}>
                 Cancel
               </button>
             </div>

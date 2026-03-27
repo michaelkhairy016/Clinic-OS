@@ -46,6 +46,14 @@ export default function MarketingDashboard() {
   const [campaignStartDate, setCampaignStartDate] = useState('');
   const [campaignEndDate, setCampaignEndDate] = useState('');
 
+  // Feedback Collection State
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackPatientId, setFeedbackPatientId] = useState('');
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [feedbackSource, setFeedbackSource] = useState<'in_person' | 'phone' | 'vezeeta'>('in_person');
+  const [patients, setPatients] = useState<PatientRow[]>([]);
+
   const [loading, setLoading] = useState(false);
   const [dateRange, setDateRange] = useState<'week' | 'month' | 'quarter' | 'year'>('month');
 
@@ -109,17 +117,75 @@ export default function MarketingDashboard() {
     fetchFollowUps();
   }, [activeClinicId, supabase]);
 
-  // Load Satisfaction Data (simulated for demo)
+  // Load Campaigns from database
   useEffect(() => {
-    const scores = [
-      { patient: 'Ahmed Mohamed', rating: 5, date: '2024-03-20', feedback: 'Excellent service, very satisfied' },
-      { patient: 'Fatima Ali', rating: 4, date: '2024-03-19', feedback: 'Good experience, professional doctor' },
-      { patient: 'Omar Hassan', rating: 5, date: '2024-03-18', feedback: 'Great improvement, friendly staff' },
-      { patient: 'Layla Mahmoud', rating: 3, date: '2024-03-17', feedback: 'Average wait time, but good treatment' }
-    ];
-    setSatisfactionScores(scores);
-    setAverageRating(Number((scores.reduce((sum, s) => sum + s.rating, 0) / scores.length).toFixed(1)));
-  }, []);
+    const fetchCampaigns = async () => {
+      if (!activeClinicId) return;
+
+      const { data, error } = await supabase
+        .from('marketing_campaigns')
+        .select('*')
+        .eq('clinic_id', activeClinicId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching campaigns:', error);
+        return;
+      }
+
+      setCampaigns(data || []);
+    };
+
+    fetchCampaigns();
+  }, [activeClinicId, supabase]);
+
+  // Load patients for feedback selection
+  useEffect(() => {
+    const fetchPatients = async () => {
+      const { data } = await supabase
+        .from('patients')
+        .select('*')
+        .order('full_name')
+        .limit(100);
+      setPatients(data || []);
+    };
+    fetchPatients();
+  }, [supabase]);
+
+  // Load Satisfaction Data from database
+  useEffect(() => {
+    const fetchSatisfaction = async () => {
+      if (!activeClinicId) return;
+
+      const { data, error } = await supabase
+        .from('satisfaction_scores')
+        .select('*, patients(full_name, patient_code)')
+        .eq('clinic_id', activeClinicId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error) {
+        console.error('Error fetching satisfaction scores:', error);
+        return;
+      }
+
+      const formattedData = (data || []).map(score => ({
+        id: score.id,
+        patient: score.patients?.full_name || 'Anonymous',
+        patientCode: score.patients?.patient_code,
+        rating: score.rating,
+        date: score.created_at,
+        feedback: score.feedback || ''
+      }));
+
+      setSatisfactionScores(formattedData);
+      if (formattedData.length > 0) {
+        setAverageRating(Number((formattedData.reduce((sum: number, s: any) => sum + s.rating, 0) / formattedData.length).toFixed(1)));
+      }
+    };
+
+    fetchSatisfaction();
+  }, [activeClinicId, supabase]);
 
   const handleScheduleFollowUp = async () => {
     if (!selectedPatient || !activeClinicId) return;
@@ -172,9 +238,20 @@ export default function MarketingDashboard() {
 
       if (error) throw error;
 
+      // Refresh campaigns list
+      const { data: updatedCampaigns } = await supabase
+        .from('marketing_campaigns')
+        .select('*')
+        .eq('clinic_id', activeClinicId)
+        .order('created_at', { ascending: false });
+
+      setCampaigns(updatedCampaigns || []);
+
       setShowCampaignModal(false);
       setCampaignName('');
       setCampaignMessage('');
+      setCampaignStartDate('');
+      setCampaignEndDate('');
       alert('تم إنشاء الحملة بنجاح!\n\nCampaign created successfully!');
     } catch (error: any) {
       console.error('Error creating campaign:', error);
@@ -188,6 +265,60 @@ export default function MarketingDashboard() {
     if (rating >= 4) return '#28a745';
     if (rating === 3) return '#ffc107';
     return '#dc3545';
+  };
+
+  const handleCollectFeedback = async () => {
+    if (!feedbackPatientId || !feedbackRating) {
+      alert('Please select a patient and rating\n\nالرجاء اختيار المريض والتقييم');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('satisfaction_scores').insert({
+        patient_id: feedbackPatientId,
+        rating: feedbackRating,
+        feedback: feedbackText,
+        source: feedbackSource,
+        clinic_id: activeClinicId
+      });
+
+      if (error) throw error;
+
+      // Refresh satisfaction scores
+      const { data: updatedScores } = await supabase
+        .from('satisfaction_scores')
+        .select('*, patients(full_name, patient_code)')
+        .eq('clinic_id', activeClinicId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (updatedScores) {
+        const formattedData = updatedScores.map(score => ({
+          id: score.id,
+          patient: score.patients?.full_name || 'Anonymous',
+          patientCode: score.patients?.patient_code,
+          rating: score.rating,
+          date: score.created_at,
+          feedback: score.feedback || ''
+        }));
+        setSatisfactionScores(formattedData);
+        if (formattedData.length > 0) {
+          setAverageRating(Number((formattedData.reduce((sum: number, s: any) => sum + s.rating, 0) / formattedData.length).toFixed(1)));
+        }
+      }
+
+      setShowFeedbackModal(false);
+      setFeedbackPatientId('');
+      setFeedbackRating(5);
+      setFeedbackText('');
+      alert('تم تسجيل التقييم بنجاح!\n\nFeedback recorded successfully!');
+    } catch (error: any) {
+      console.error('Error collecting feedback:', error);
+      alert('خطأ في تسجيل التقييم: ' + error.message + '\n\nError recording feedback: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -363,35 +494,44 @@ export default function MarketingDashboard() {
                 <Star size={20} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '8px' }} />
                 Patient Satisfaction / رضا المرضى
               </h2>
+              <button
+                className="btn btn-primary"
+                onClick={() => setShowFeedbackModal(true)}
+                style={{ padding: '0.6rem 1rem', fontSize: '0.85rem' }}
+              >
+                <Plus size={16} /> Collect Feedback
+              </button>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {satisfactionScores.slice(0, 5).map((score, index) => (
-                <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', borderRadius: '8px', background: 'white' }}>
-                  <div style={{ display: 'flex', gap: '4px' }}>
-                    {[1, 2, 3, 4, 5].map(star => (
-                      <Star
-                        key={star}
-                        size={16}
-                        fill={star <= score.rating ? getRatingColor(score.rating) : '#e9ecef'}
-                        style={{ color: star <= score.rating ? getRatingColor(score.rating) : '#e9ecef' }}
-                      />
-                    ))}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{score.patient}</div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-light)', marginTop: '2px' }}>
-                      {new Date(score.date).toLocaleDateString()}
+              {satisfactionScores.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-light)' }}>
+                  <Star size={32} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
+                  <div>No feedback collected yet</div>
+                  <div style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>Click "Collect Feedback" to add patient reviews</div>
+                </div>
+              ) : (
+                satisfactionScores.slice(0, 5).map((score, index) => (
+                  <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', borderRadius: '8px', background: 'white' }}>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      {[1, 2, 3, 4, 5].map(star => (
+                        <Star
+                          key={star}
+                          size={16}
+                          fill={star <= score.rating ? getRatingColor(score.rating) : '#e9ecef'}
+                          style={{ color: star <= score.rating ? getRatingColor(score.rating) : '#e9ecef' }}
+                        />
+                      ))}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{score.patient}</div>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-light)', marginTop: '2px' }}>
+                        {new Date(score.date).toLocaleDateString()}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)', textAlign: 'center' }}>
-              <button className="btn btn-secondary" style={{ fontSize: '0.9rem' }}>
-                View All Reviews / عرض جميع التقييمات
-              </button>
+                ))
+              )}
             </div>
           </div>
 
@@ -663,6 +803,124 @@ export default function MarketingDashboard() {
               <button
                 className="btn btn-secondary"
                 onClick={() => setShowCampaignModal(false)}
+                disabled={loading}
+                style={{ padding: '1.2rem', fontSize: '1.1rem' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Feedback Collection Modal */}
+      {showFeedbackModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="card shadow-lg" style={{ maxWidth: 500, width: '100%', padding: '2rem', borderRadius: '24px' }}>
+            <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
+              <h2 style={{ color: 'var(--primary)', margin: 0, fontWeight: 800 }}>Collect Feedback</h2>
+              <button onClick={() => setShowFeedbackModal(false)}><X size={24} /></button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: 800, marginBottom: '8px' }}>
+                  Select Patient / اختيار المريض *
+                </label>
+                <select
+                  value={feedbackPatientId}
+                  onChange={e => setFeedbackPatientId(e.target.value)}
+                  style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid var(--border)', fontSize: '1rem' }}
+                >
+                  <option value="">-- Select Patient --</option>
+                  {patients.map(p => (
+                    <option key={p.id} value={p.id}>{p.full_name} ({p.patient_code})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontWeight: 800, marginBottom: '12px' }}>
+                  Rating / التقييم *
+                </label>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                  {[1, 2, 3, 4, 5].map(rating => (
+                    <button
+                      key={rating}
+                      type="button"
+                      onClick={() => setFeedbackRating(rating)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '4px'
+                      }}
+                    >
+                      <Star
+                        size={32}
+                        fill={rating <= feedbackRating ? getRatingColor(feedbackRating) : '#e9ecef'}
+                        style={{ color: rating <= feedbackRating ? getRatingColor(feedbackRating) : '#e9ecef' }}
+                      />
+                    </button>
+                  ))}
+                </div>
+                <div style={{ textAlign: 'center', marginTop: '8px', fontWeight: 600, color: getRatingColor(feedbackRating) }}>
+                  {feedbackRating} Star{feedbackRating !== 1 ? 's' : ''}
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontWeight: 800, marginBottom: '8px' }}>
+                  Feedback Source / مصدر التقييم
+                </label>
+                <select
+                  value={feedbackSource}
+                  onChange={e => setFeedbackSource(e.target.value as any)}
+                  style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid var(--border)', fontSize: '1rem' }}
+                >
+                  <option value="in_person">In Person / في العيادة</option>
+                  <option value="phone">Phone Call / مكالمة هاتفية</option>
+                  <option value="vezeeta">Vezeeta Platform / منصة فيزيتا</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontWeight: 800, marginBottom: '8px' }}>
+                  Feedback Notes / ملاحظات
+                </label>
+                <textarea
+                  value={feedbackText}
+                  onChange={e => setFeedbackText(e.target.value)}
+                  rows={3}
+                  placeholder="Patient feedback or comments..."
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    borderRadius: '12px',
+                    border: '1px solid var(--border)',
+                    fontSize: '1rem',
+                    fontFamily: 'inherit'
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+              <button
+                className="btn btn-primary"
+                onClick={handleCollectFeedback}
+                disabled={loading}
+                style={{ flex: 1, padding: '1.2rem', fontSize: '1.1rem', fontWeight: 800 }}
+              >
+                {loading ? 'Saving...' : (
+                  <>
+                    <Star size={20} /> Save Feedback
+                  </>
+                )}
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowFeedbackModal(false)}
                 disabled={loading}
                 style={{ padding: '1.2rem', fontSize: '1.1rem' }}
               >

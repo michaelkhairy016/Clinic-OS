@@ -79,6 +79,34 @@ export default function ClinicalPage() {
   const [duration, setDuration] = useState('');
   const [prescription, setPrescription] = useState<PrescriptionDrug[]>([]);
 
+  // Frequency options for dropdown
+  const frequencyOptions = [
+    { value: 'OD', label: 'OD (Once daily)', labelAr: 'مرة يومياً' },
+    { value: 'BID', label: 'BID (Twice daily)', labelAr: 'مرتين يومياً' },
+    { value: 'TID', label: 'TID (3x daily)', labelAr: '3 مرات يومياً' },
+    { value: 'QID', label: 'QID (4x daily)', labelAr: '4 مرات يومياً' },
+    { value: 'QHS', label: 'QHS (At bedtime)', labelAr: 'قبل النوم' },
+    { value: 'QOD', label: 'QOD (Every other day)', labelAr: 'يوم بعد يوم' },
+    { value: 'PRN', label: 'PRN (As needed)', labelAr: 'عند الحاجة' },
+    { value: 'AC', label: 'AC (Before meals)', labelAr: 'قبل الأكل' },
+    { value: 'PC', label: 'PC (After meals)', labelAr: 'بعد الأكل' },
+    { value: 'STAT', label: 'STAT (Immediately)', labelAr: 'فوراً' },
+  ];
+
+  // Duration options for dropdown
+  const durationOptions = [
+    { value: '3 days', label: '3 days' },
+    { value: '5 days', label: '5 days' },
+    { value: '1 week', label: '1 week' },
+    { value: '2 weeks', label: '2 weeks' },
+    { value: '3 weeks', label: '3 weeks' },
+    { value: '1 month', label: '1 month' },
+    { value: '2 months', label: '2 months' },
+    { value: '3 months', label: '3 months' },
+    { value: '6 months', label: '6 months' },
+    { value: 'Ongoing', label: 'Ongoing/Indefinite' },
+  ];
+
   // Validation state
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -418,8 +446,18 @@ export default function ClinicalPage() {
                 ))}
               </select>
               <input placeholder="Dose (10mg)" value={dose} onChange={e => setDose(e.target.value)} style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border)' }} />
-              <input placeholder="Freq (OD)" value={freq} onChange={e => setFreq(e.target.value)} style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border)' }} />
-              <input placeholder="Dur." value={duration} onChange={e => setDuration(e.target.value)} style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border)' }} />
+              <select value={freq} onChange={e => setFreq(e.target.value)} style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                <option value="">-- Freq --</option>
+                {frequencyOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.value}</option>
+                ))}
+              </select>
+              <select value={duration} onChange={e => setDuration(e.target.value)} style={{ padding: '12px', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                <option value="">-- Dur --</option>
+                {durationOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
               <button className="btn btn-primary" onClick={handleAddMed} style={{ padding: '12px' }}><Plus/></button>
             </div>
 
