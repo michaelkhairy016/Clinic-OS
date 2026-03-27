@@ -4,8 +4,9 @@ import React, { useState, useEffect } from 'react';
 import {
   CheckCircle2, X, User, Clock, Search,
   DollarSign, Receipt, AlertCircle, ArrowRight,
-  Plus, Trash2, RefreshCw
+  Plus, Trash2, RefreshCw, QrCode, Smartphone
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '@/modules/auth/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import { validatePatientForm, formatValidationErrors, sanitizePhoneNumber } from '@/lib/validation';
@@ -17,6 +18,10 @@ type PendingVisit = PatientVisitRow & {
 
 export default function AssistantPage() {
   const { role, activeClinicId, user } = useAuth();
+
+  // QR Code URL for patient intake form
+  const [showQRModal, setShowQRModal] = useState(false);
+  const intakeFormUrl = typeof window !== 'undefined' ? `${window.location.origin}/patient/form` : '';
 
   // State for pending patient visits
   const [pendingVisits, setPendingVisits] = useState<PendingVisit[]>([]);
@@ -395,6 +400,40 @@ export default function AssistantPage() {
 
         {/* Quick Actions */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* QR Code for Patient Intake */}
+          <div className="card shadow-sm" style={{ padding: '1.5rem', textAlign: 'center', border: '2px solid var(--primary)' }}>
+            <h3 style={{ margin: '0 0 1rem 0', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <QrCode size={24} /> Patient Intake QR
+            </h3>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginBottom: '1rem' }}>
+              Scan to fill intake form / امسح الكود لتعبئة الاستمارة
+            </p>
+            <div style={{ background: 'white', padding: '1rem', borderRadius: '12px', display: 'inline-block' }}>
+              <QRCodeSVG
+                value={intakeFormUrl}
+                size={150}
+                level="H"
+                includeMargin={true}
+              />
+            </div>
+            <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => navigator.clipboard?.writeText(intakeFormUrl)}
+                style={{ fontSize: '0.85rem', padding: '8px 16px' }}
+              >
+                Copy Link
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => setShowQRModal(true)}
+                style={{ fontSize: '0.85rem', padding: '8px 16px' }}
+              >
+                <Smartphone size={16} /> Large View
+              </button>
+            </div>
+          </div>
+
           <button
             className="btn btn-primary"
             onClick={() => setShowReturningPatient(true)}
@@ -688,6 +727,51 @@ export default function AssistantPage() {
                 ))
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* QR Code Large View Modal */}
+      {showQRModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="card shadow-lg" style={{ maxWidth: 500, width: '100%', padding: '2rem', borderRadius: '24px', textAlign: 'center' }}>
+            <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
+              <h2 style={{ color: 'var(--primary)', margin: 0, fontWeight: 800, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <QrCode size={24} /> Patient Intake QR
+              </h2>
+              <button onClick={() => setShowQRModal(false)}><X size={24} /></button>
+            </div>
+
+            <div style={{ background: 'white', padding: '2rem', borderRadius: '16px', display: 'inline-block', marginBottom: '1.5rem' }}>
+              <QRCodeSVG
+                value={intakeFormUrl}
+                size={300}
+                level="H"
+                includeMargin={true}
+              />
+            </div>
+
+            <p style={{ fontSize: '1.1rem', color: 'var(--text-medium)', marginBottom: '1rem' }}>
+              Scan this QR code to fill the patient intake form
+            </p>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginBottom: '1.5rem', direction: 'rtl' }}>
+              امسح هذا الكود لتعبئة استمارة المريض
+            </p>
+
+            <div style={{ background: 'var(--bg-color)', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', wordBreak: 'break-all', fontSize: '0.85rem' }}>
+              <strong>URL:</strong> {intakeFormUrl}
+            </div>
+
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                navigator.clipboard?.writeText(intakeFormUrl);
+                alert('Link copied! / تم نسخ الرابط!');
+              }}
+              style={{ width: '100%', padding: '1rem' }}
+            >
+              <Smartphone size={20} /> Copy Link to Share
+            </button>
           </div>
         </div>
       )}

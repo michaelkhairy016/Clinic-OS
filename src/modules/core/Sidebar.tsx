@@ -33,9 +33,12 @@ export const Sidebar = () => {
   }, [activeClinicId, supabase]);
 
   // Determine poke-yoke display state
-  // Show indicator only when there are other users present
+  // Show indicator when there are other users present (at same or different clinic)
   const hasOtherUsers = syncStatus.sameClinicUsers.length > 0 || syncStatus.otherClinicUsers.length > 0;
   const showPokeYoke = hasOtherUsers && activeClinicId;
+
+  // Determine indicator type: green if all at same clinic, yellow if anyone at different clinic
+  const allAtSameClinic = syncStatus.otherClinicUsers.length === 0;
 
   // Get other users' names for tooltip
   const sameClinicNames = syncStatus.sameClinicUsers.map(u => u.user_name || 'Unknown').join(', ');
@@ -68,19 +71,19 @@ export const Sidebar = () => {
             style={{
               marginTop: '1rem',
               padding: '8px 12px',
-              background: syncStatus.isSynced ? 'var(--bg-color)' : '#fff3cd',
-              color: syncStatus.isSynced ? 'var(--primary)' : '#856404',
+              background: showPokeYoke && !allAtSameClinic ? '#fff3cd' : 'var(--bg-color)',
+              color: showPokeYoke && !allAtSameClinic ? '#856404' : 'var(--primary)',
               borderRadius: '8px',
               fontSize: '0.9rem',
               fontWeight: 800,
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              border: syncStatus.isSynced ? 'none' : '2px solid #ffc107',
+              border: showPokeYoke && !allAtSameClinic ? '2px solid #ffc107' : 'none',
               transition: 'all 0.3s ease'
             }}
             title={showPokeYoke ?
-              (syncStatus.isSynced
+              (allAtSameClinic
                 ? `Same clinic: ${sameClinicNames}`
                 : `WARNING: Different clinics! ${otherClinicNames}`)
               : ''
@@ -88,7 +91,7 @@ export const Sidebar = () => {
           >
              <MapPin size={16} /> {activeClinicName}
 
-             {/* Poke-yoke indicator - only show when other users are present */}
+             {/* Poke-yoke indicator - show when other users are present */}
              {showPokeYoke && (
                <div style={{
                  marginLeft: 'auto',
@@ -96,7 +99,7 @@ export const Sidebar = () => {
                  alignItems: 'center',
                  gap: '4px'
                }}>
-                 {syncStatus.isSynced ? (
+                 {allAtSameClinic ? (
                    // Green flag - everyone at same clinic
                    <div style={{
                      display: 'flex',
@@ -108,11 +111,11 @@ export const Sidebar = () => {
                      borderRadius: '12px',
                      fontSize: '0.75rem'
                    }}>
-                     <Flag size={12} style={{ color: '#28a745' }} />
                      <CheckCircle size={14} />
+                     <span>Synced</span>
                    </div>
                  ) : (
-                   // Yellow/red warning - someone at different clinic
+                   // Yellow warning - someone at different clinic
                    <div style={{
                      display: 'flex',
                      alignItems: 'center',
@@ -133,7 +136,7 @@ export const Sidebar = () => {
           </div>
         )}
 
-        {/* Show who's online when there are other users */}
+        {/* Show who's online when there are other users at same clinic */}
         {showPokeYoke && syncStatus.sameClinicUsers.length > 0 && (
           <div style={{
             marginTop: '0.5rem',
@@ -148,7 +151,7 @@ export const Sidebar = () => {
         )}
 
         {/* Warning about different clinics */}
-        {showPokeYoke && !syncStatus.isSynced && (
+        {showPokeYoke && !allAtSameClinic && (
           <div style={{
             marginTop: '0.5rem',
             padding: '8px 10px',
@@ -159,7 +162,7 @@ export const Sidebar = () => {
             border: '1px solid #ffc107'
           }}>
             <AlertTriangle size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-            Some staff are at a different clinic! Verify before proceeding.
+            Staff at different clinic! Verify before proceeding.
           </div>
         )}
       </div>

@@ -79,9 +79,9 @@ export function usePresence() {
     const doctorPresent = sameClinicUsers.some(u => u.role === 'doctor');
     const assistantPresent = sameClinicUsers.some(u => u.role === 'assistant');
 
-    // Show warning only if there are users at different clinics
-    // AND there are users at same clinic (both are active)
-    const showWarning = otherClinicUsers.length > 0 && sameClinicUsers.length > 0;
+    // Show warning if there are other users online AND any of them are at a DIFFERENT clinic
+    // This means: if doctor at Clinic A and assistant at Clinic B, both should see warning
+    const showWarning = otherUsers.length > 0 && otherClinicUsers.length > 0;
 
     return {
       isSynced: !showWarning,

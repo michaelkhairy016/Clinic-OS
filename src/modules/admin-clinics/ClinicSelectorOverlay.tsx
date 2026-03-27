@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { MapPin, Building2, Loader2, LogOut } from 'lucide-react';
 
 export default function ClinicSelectorOverlay() {
-  const { user, activeClinicId, setActiveClinicId, logout } = useAuth();
+  const { user, role, activeClinicId, setActiveClinicId, logout } = useAuth();
   const [clinics, setClinics] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
@@ -20,14 +20,31 @@ export default function ClinicSelectorOverlay() {
     if (user) fetchClinics();
   }, [user, supabase]);
 
+  // Show overlay for ALL authenticated users without an active clinic
   if (!user || activeClinicId) return null;
+
+  // Role-based welcome text
+  const getWelcomeText = () => {
+    switch (role) {
+      case 'doctor':
+        return { title: 'Welcome back, Doctor', subtitle: 'Please select your current workspace for today' };
+      case 'assistant':
+        return { title: 'مرحباً بك / Welcome', subtitle: 'اختر العيادة الحالية / Select current clinic' };
+      case 'marketing':
+        return { title: 'Welcome to Marketing Dashboard', subtitle: 'Select clinic to view analytics' };
+      default:
+        return { title: 'Welcome', subtitle: 'Select your clinic' };
+    }
+  };
+
+  const welcome = getWelcomeText();
 
   return (
     <div style={{
       position: 'fixed',
       inset: 0,
       zIndex: 9999,
-      background: 'rgba(255, 255, 255, 0.85)',
+      background: 'rgba(255, 255, 255, 0.95)',
       backdropFilter: 'blur(12px)',
       display: 'flex',
       alignItems: 'center',
@@ -37,10 +54,10 @@ export default function ClinicSelectorOverlay() {
       <div style={{ maxWidth: '600px', width: '100%', textAlign: 'center' }}>
         <Building2 size={64} style={{ color: 'var(--primary)', margin: '0 auto 1.5rem' }} />
         <h1 style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-dark)', marginBottom: '1rem' }}>
-          Welcome back, Doctor
+          {welcome.title}
         </h1>
         <p style={{ color: 'var(--text-light)', marginBottom: '3rem', fontSize: '1.1rem' }}>
-          Please select your current workspace for today
+          {welcome.subtitle}
         </p>
 
         {loading ? (
@@ -48,8 +65,8 @@ export default function ClinicSelectorOverlay() {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
             {clinics.map(clinic => (
-              <button 
-                key={clinic.id} 
+              <button
+                key={clinic.id}
                 onClick={() => setActiveClinicId(clinic.id)}
                 className="card"
                 style={{
@@ -92,16 +109,17 @@ export default function ClinicSelectorOverlay() {
           </div>
         )}
 
-        <button 
+        <button
           onClick={() => logout()}
-          style={{ 
-            marginTop: '3rem', 
-            background: 'none', 
-            border: 'none', 
-            color: 'var(--text-light)', 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px', 
+          type="button"
+          style={{
+            marginTop: '3rem',
+            background: 'none',
+            border: 'none',
+            color: 'var(--text-light)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
             margin: '3rem auto 0',
             cursor: 'pointer'
           }}

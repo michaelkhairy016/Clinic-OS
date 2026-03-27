@@ -233,7 +233,8 @@ INSERT INTO public.titration_protocols (medication_name, start_dose, target_dose
 
 ALTER TABLE public.titration_protocols ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "titration_protocols_staff_approved"
+DROP POLICY IF EXISTS "titration_protocols_staff_approved" ON public.titration_protocols;
+CREATE POLICY "titration_protocols_staff_approved"
   ON public.titration_protocols FOR ALL
   USING (public.is_staff_approved())
   WITH CHECK (public.is_staff_approved());
