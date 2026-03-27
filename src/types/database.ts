@@ -195,29 +195,7 @@ export type MRVisitRow = {
 };
 
 // Marketing tables (migration 012)
-export type ReferralSourceRow = {
-  id: string;
-  name_ar: string;
-  name_en: string;
-  description: string | null;
-  is_active: boolean;
-  created_at: string;
-};
-
-export type FollowUpRow = {
-  id: string;
-  patient_id: string;
-  clinic_id: string;
-  follow_up_type: 'call' | 'visit' | 'message';
-  scheduled_date: string;
-  completed_date: string | null;
-  status: 'scheduled' | 'completed' | 'cancelled' | 'no_show';
-  notes: string | null;
-  outcome: string | null;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-};
+// Note: ReferralSourceRow already defined above
 
 export type MarketingCampaignRow = {
   id: string;

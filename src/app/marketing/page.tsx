@@ -30,13 +30,6 @@ export default function MarketingDashboard() {
   const [satisfactionScores, setSatisfactionScores] = useState<any[]>([]);
   const [averageRating, setAverageRating] = useState(0);
 
-  // Follow-up Management
-  const [followUps, setFollowUps] = useState<any[]>([]);
-  const [showFollowUpModal, setShowFollowUpModal] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState<PatientRow | null>(null);
-  const [followUpNotes, setFollowUpNotes] = useState('');
-  const [followUpType, setFollowUpType] = useState<'call' | 'visit' | 'message'>('call');
-
   // Marketing Campaign State
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [showCampaignModal, setShowCampaignModal] = useState(false);
@@ -99,22 +92,6 @@ export default function MarketingDashboard() {
     };
 
     fetchAnalytics();
-  }, [activeClinicId, supabase]);
-
-  // Load Follow-up Data
-  useEffect(() => {
-    const fetchFollowUps = async () => {
-      const { data } = await supabase
-        .from('follow_ups')
-        .select('*, patients(full_name, patient_code, phone)')
-        .eq('clinic_id', activeClinicId)
-        .order('scheduled_date', { ascending: true })
-        .limit(20);
-
-      setFollowUps(data || []);
-    };
-
-    fetchFollowUps();
   }, [activeClinicId, supabase]);
 
   // Load Campaigns from database
@@ -186,37 +163,6 @@ export default function MarketingDashboard() {
 
     fetchSatisfaction();
   }, [activeClinicId, supabase]);
-
-  const handleScheduleFollowUp = async () => {
-    if (!selectedPatient || !activeClinicId) return;
-
-    setLoading(true);
-    try {
-      const scheduledDate = new Date();
-      scheduledDate.setDate(scheduledDate.getDate() + 3); // Schedule 3 days from now
-
-      const { error } = await supabase.from('follow_ups').insert({
-        patient_id: selectedPatient.id,
-        clinic_id: activeClinicId,
-        follow_up_type: followUpType,
-        notes: followUpNotes,
-        scheduled_date: scheduledDate.toISOString(),
-        status: 'scheduled'
-      });
-
-      if (error) throw error;
-
-      setShowFollowUpModal(false);
-      setSelectedPatient(null);
-      setFollowUpNotes('');
-      alert('تم جدار المتابعة بنجاح!\n\nFollow-up scheduled successfully!');
-    } catch (error: any) {
-      console.error('Error scheduling follow-up:', error);
-      alert('خطأ في جدار المتابعة: ' + error.message + '\n\nError scheduling follow-up: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleCreateCampaign = async () => {
     if (!campaignName || !campaignMessage) {
@@ -394,7 +340,7 @@ export default function MarketingDashboard() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-        {/* Left Column - Referrals & Follow-ups */}
+        {/* Left Column - Referrals */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           {/* Referral Sources */}
           <div className="card shadow-sm">
@@ -431,56 +377,6 @@ export default function MarketingDashboard() {
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-
-          {/* Follow-up Management */}
-          <div className="card shadow-sm">
-            <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>
-                <Phone size={20} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '8px' }} />
-                Follow-ups / المتابعات
-              </h2>
-              <button
-                className="btn btn-primary"
-                onClick={() => setShowFollowUpModal(true)}
-                style={{ padding: '0.8rem 1.2rem' }}
-              >
-                <Calendar size={18} /> Schedule Follow-up
-              </button>
-            </div>
-
-            <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-              {followUps.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-light)' }}>
-                  <Clock size={32} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
-                  <div>No scheduled follow-ups</div>
-                </div>
-              ) : (
-                followUps.map(followUp => (
-                  <div key={followUp.id} className="card" style={{ padding: '1rem', marginBottom: '0.5rem', background: 'white' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                      <div>
-                        <div style={{ fontWeight: 800, fontSize: '1.1rem' }}>
-                          {followUp.patients?.full_name}
-                        </div>
-                        <div style={{ fontSize: '0.85rem', color: 'var(--text-light)' }}>
-                          {followUp.patients?.patient_code} • {new Date(followUp.scheduled_date).toLocaleDateString()}
-                        </div>
-                      </div>
-                      <span className="badge" style={{
-                        background: followUp.status === 'completed' ? '#d1e7dd' : followUp.status === 'scheduled' ? '#ffc107' : '#6c757d',
-                        color: 'white'
-                      }}>
-                        {followUp.status}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '0.9rem', color: 'var(--text-medium)' }}>
-                      <strong>{followUp.follow_up_type.toUpperCase()}:</strong> {followUp.notes}
-                    </div>
-                  </div>
-                ))
-              )}
             </div>
           </div>
         </div>
@@ -581,104 +477,6 @@ export default function MarketingDashboard() {
           </div>
         </div>
       </div>
-
-      {/* Follow-up Modal */}
-      {showFollowUpModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="card shadow-lg" style={{ maxWidth: 500, width: '100%', padding: '2rem', borderRadius: '24px' }}>
-            <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
-              <h2 style={{ color: 'var(--primary)', margin: 0, fontWeight: 800 }}>Schedule Follow-up</h2>
-              <button onClick={() => setShowFollowUpModal(false)}><X size={24} /></button>
-            </div>
-
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ display: 'block', fontWeight: 800, marginBottom: '8px' }}>
-                Select Patient / اختيار المريض
-              </label>
-              <input
-                type="text"
-                placeholder="Search patient..."
-                style={{
-                  width: '100%',
-                  padding: '14px',
-                  borderRadius: '12px',
-                  border: '1px solid var(--border)',
-                  fontSize: '1rem'
-                }}
-              />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-              <div>
-                <label style={{ display: 'block', fontWeight: 800, marginBottom: '8px' }}>
-                  Follow-up Type / نوع المتابعة
-                </label>
-                <select
-                  value={followUpType}
-                  onChange={e => setFollowUpType(e.target.value as any)}
-                  style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid var(--border)', fontSize: '1rem' }}
-                >
-                  <option value="call">Phone Call / مكالمة هاتفية</option>
-                  <option value="visit">Clinic Visit / زيارة للعيادة</option>
-                  <option value="message">WhatsApp Message / رسالة واتساب</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ display: 'block', fontWeight: 800, marginBottom: '8px' }}>
-                  Scheduled Date / التاريخ المقرر
-                </label>
-                <input
-                  type="date"
-                  style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid var(--border)', fontSize: '1rem' }}
-                />
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ display: 'block', fontWeight: 800, marginBottom: '8px' }}>
-                Notes / ملاحظات
-              </label>
-              <textarea
-                value={followUpNotes}
-                onChange={e => setFollowUpNotes(e.target.value)}
-                rows={4}
-                placeholder="Follow-up notes..."
-                style={{
-                  width: '100%',
-                  padding: '14px',
-                  borderRadius: '12px',
-                  border: '1px solid var(--border)',
-                  fontSize: '1rem',
-                  fontFamily: 'inherit'
-                }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-              <button
-                className="btn btn-primary"
-                onClick={handleScheduleFollowUp}
-                disabled={loading}
-                style={{ flex: 1, padding: '1.2rem', fontSize: '1.1rem' }}
-              >
-                {loading ? 'Scheduling...' : (
-                  <>
-                    <Phone size={20} /> Schedule Follow-up
-                  </>
-                )}
-              </button>
-              <button
-                className="btn btn-secondary"
-                onClick={() => setShowFollowUpModal(false)}
-                disabled={loading}
-                style={{ padding: '1.2rem', fontSize: '1.1rem' }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Campaign Modal */}
       {showCampaignModal && (
