@@ -193,3 +193,56 @@ export type MRVisitRow = {
   notes: string | null;
   clinic_id: string | null;
 };
+
+// Marketing tables (migration 012)
+export type ReferralSourceRow = {
+  id: string;
+  name_ar: string;
+  name_en: string;
+  description: string | null;
+  is_active: boolean;
+  created_at: string;
+};
+
+export type FollowUpRow = {
+  id: string;
+  patient_id: string;
+  clinic_id: string;
+  follow_up_type: 'call' | 'visit' | 'message';
+  scheduled_date: string;
+  completed_date: string | null;
+  status: 'scheduled' | 'completed' | 'cancelled' | 'no_show';
+  notes: string | null;
+  outcome: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MarketingCampaignRow = {
+  id: string;
+  clinic_id: string;
+  name: string;
+  type: 'social' | 'vezeeta' | 'referral' | 'email' | 'other';
+  message: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  status: 'draft' | 'active' | 'paused' | 'completed';
+  budget: number | null;
+  reach: number;
+  conversions: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SatisfactionScoreRow = {
+  id: string;
+  patient_id: string | null;
+  clinic_id: string;
+  rating: number;
+  feedback: string | null;
+  source: 'in_person' | 'phone' | 'vezeeta' | 'google' | 'other';
+  would_recommend: boolean | null;
+  created_at: string;
+};
