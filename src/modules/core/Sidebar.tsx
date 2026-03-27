@@ -5,18 +5,23 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Users, UserPlus, FileBarChart, Settings,
-  UserCheck, MapPin, Briefcase, Wallet, Search as UserSearch, Share2
+  UserCheck, MapPin, Briefcase, Wallet, Search as UserSearch, Share2,
+  Flag, AlertTriangle, CheckCircle
 } from 'lucide-react';
 
 import { useAuth } from '@/modules/auth/AuthContext';
 import { createClient } from '@/lib/supabase/client';
+import { usePresence } from '@/hooks/usePresence';
 
 export const Sidebar = () => {
   const pathname = usePathname();
-  const { role, activeClinicId } = useAuth();
+  const { role, activeClinicId, user } = useAuth();
   const [activeClinicName, setActiveClinicName] = React.useState<string | null>(null);
   const isDoc = role === 'doctor';
   const supabase = React.useMemo(() => createClient(), []);
+
+  // Poke-yoke presence tracking
+  const { syncStatus } = usePresence();
 
   React.useEffect(() => {
     const fetchClinic = async () => {
@@ -26,6 +31,15 @@ export const Sidebar = () => {
     };
     fetchClinic();
   }, [activeClinicId, supabase]);
+
+  // Determine poke-yoke display state
+  // Show indicator only when there are other users present
+  const hasOtherUsers = syncStatus.sameClinicUsers.length > 0 || syncStatus.otherClinicUsers.length > 0;
+  const showPokeYoke = hasOtherUsers && activeClinicId;
+
+  // Get other users' names for tooltip
+  const sameClinicNames = syncStatus.sameClinicUsers.map(u => u.user_name || 'Unknown').join(', ');
+  const otherClinicNames = syncStatus.otherClinicUsers.map(u => `${u.user_name || 'Unknown'} (different clinic)`).join(', ');
 
   const allNavItems = [
     { label: isDoc ? 'Clinical Brain (Libr.)' : 'المكتبة السريرية', href: '/', icon: <Settings size={20} />, roles: ['doctor'] },
@@ -50,8 +64,102 @@ export const Sidebar = () => {
           {isDoc ? 'Dr. Amgad\nClinic-OS' : 'عيادة\nد. أمجد خيري كامل'}
         </h2>
         {activeClinicName && (
-          <div style={{ marginTop: '1rem', padding: '8px 12px', background: 'var(--bg-color)', color: 'var(--primary)', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div
+            style={{
+              marginTop: '1rem',
+              padding: '8px 12px',
+              background: syncStatus.isSynced ? 'var(--bg-color)' : '#fff3cd',
+              color: syncStatus.isSynced ? 'var(--primary)' : '#856404',
+              borderRadius: '8px',
+              fontSize: '0.9rem',
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              border: syncStatus.isSynced ? 'none' : '2px solid #ffc107',
+              transition: 'all 0.3s ease'
+            }}
+            title={showPokeYoke ?
+              (syncStatus.isSynced
+                ? `Same clinic: ${sameClinicNames}`
+                : `WARNING: Different clinics! ${otherClinicNames}`)
+              : ''
+            }
+          >
              <MapPin size={16} /> {activeClinicName}
+
+             {/* Poke-yoke indicator - only show when other users are present */}
+             {showPokeYoke && (
+               <div style={{
+                 marginLeft: 'auto',
+                 display: 'flex',
+                 alignItems: 'center',
+                 gap: '4px'
+               }}>
+                 {syncStatus.isSynced ? (
+                   // Green flag - everyone at same clinic
+                   <div style={{
+                     display: 'flex',
+                     alignItems: 'center',
+                     gap: '4px',
+                     padding: '2px 8px',
+                     background: '#28a745',
+                     color: 'white',
+                     borderRadius: '12px',
+                     fontSize: '0.75rem'
+                   }}>
+                     <Flag size={12} style={{ color: '#28a745' }} />
+                     <CheckCircle size={14} />
+                   </div>
+                 ) : (
+                   // Yellow/red warning - someone at different clinic
+                   <div style={{
+                     display: 'flex',
+                     alignItems: 'center',
+                     gap: '4px',
+                     padding: '2px 8px',
+                     background: '#ffc107',
+                     color: '#856404',
+                     borderRadius: '12px',
+                     fontSize: '0.75rem',
+                     animation: 'pulse 1.5s infinite'
+                   }}>
+                     <AlertTriangle size={14} />
+                     <span>Mismatch!</span>
+                   </div>
+                 )}
+               </div>
+             )}
+          </div>
+        )}
+
+        {/* Show who's online when there are other users */}
+        {showPokeYoke && syncStatus.sameClinicUsers.length > 0 && (
+          <div style={{
+            marginTop: '0.5rem',
+            padding: '6px 10px',
+            background: '#e8f5e9',
+            borderRadius: '6px',
+            fontSize: '0.75rem',
+            color: '#2e7d32'
+          }}>
+            <strong>Online:</strong> {sameClinicNames}
+          </div>
+        )}
+
+        {/* Warning about different clinics */}
+        {showPokeYoke && !syncStatus.isSynced && (
+          <div style={{
+            marginTop: '0.5rem',
+            padding: '8px 10px',
+            background: '#fff3cd',
+            borderRadius: '6px',
+            fontSize: '0.75rem',
+            color: '#856404',
+            border: '1px solid #ffc107'
+          }}>
+            <AlertTriangle size={12} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+            Some staff are at a different clinic! Verify before proceeding.
           </div>
         )}
       </div>

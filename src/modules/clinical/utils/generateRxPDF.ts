@@ -10,177 +10,254 @@ type RxDrug = {
   trade_name_ar?: string;
 };
 
+// Arabic frequency translations
+const frequencyArabic: Record<string, string> = {
+  'OD': 'مرة يومياً',
+  'QD': 'مرة يومياً',
+  'BID': 'مرتين يومياً',
+  'TID': 'ثلاث مرات يومياً',
+  'QID': 'أربع مرات يومياً',
+  'QHS': 'قبل النوم',
+  'HS': 'وقت النوم',
+  'QOD': 'يوم بعد يوم',
+  'PRN': 'عند الحاجة',
+  'AC': 'قبل الأكل',
+  'PC': 'بعد الأكل',
+  'STAT': 'فوراً',
+  'Q4H': 'كل 4 ساعات',
+  'Q6H': 'كل 6 ساعات',
+  'Q8H': 'كل 8 ساعات',
+  'Q12H': 'كل 12 ساعة',
+};
+
+// Arabic duration translations
+const getArabicDuration = (duration: string): string => {
+  const map: Record<string, string> = {
+    '3 days': '3 أيام',
+    '5 days': '5 أيام',
+    '1 week': 'أسبوع',
+    '2 weeks': 'أسبوعين',
+    '3 weeks': '3 أسابيع',
+    '1 month': 'شهر',
+    '2 months': 'شهرين',
+    '3 months': '3 أشهر',
+    '6 months': '6 أشهر',
+    'Ongoing': 'استمرار',
+  };
+  return map[duration] || duration;
+};
+
 /**
- * Generate Prescription PDF matching Dr. Amgad's template
- * Based on Prescription PDF.pdf template
+ * Generate Prescription PDF - With template background support
+ * Medicine name in English, instructions in Arabic RTL
+ *
+ * To use your PDF template as background:
+ * 1. Convert Prescription PDF.pdf to PNG image
+ * 2. Place it in public/prescription-template.png
+ * 3. Set useTemplateBackground: true when calling this function
  */
-export const generateRxPDF = (
+export const generateRxPDF = async (
   patient: PatientRow,
   drugs: RxDrug[],
   doctorName: string = "Dr. Amgad Khairy Kamel",
-  diagnosis: string = ""
+  diagnosis: string = "",
+  severity?: 'mild' | 'moderate' | 'severe',
+  useTemplateBackground: boolean = false
 ) => {
   const doc = new jsPDF();
-  const pageWidth = 210; // A4 width in mm
-  const margin = 20;
+  const pageWidth = 210;
+  const pageHeight = 297;
+  const margin = 15;
 
-  // ========== HEADER ==========
-  // Doctor Name - centered, large
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(18);
-  doc.setFont('helvetica', 'bold');
-  doc.text(doctorName, pageWidth / 2, 18, { align: 'center' });
+  let y = 15;
 
-  // Credentials
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'normal');
-  doc.text("M.B.B.Ch, M.Sc. Psychiatry", pageWidth / 2, 26, { align: 'center' });
+  // If using template background, load and apply it
+  if (useTemplateBackground) {
+    try {
+      // The template should be placed at public/prescription-template.png
+      // You need to convert your PDF to PNG first
+      const templatePath = '/prescription-template.png';
 
-  // Address
-  doc.setFontSize(10);
-  doc.text("250 Teraa Elbolakya St., Shoubra, Cairo", pageWidth / 2, 33, { align: 'center' });
+      // For now, we'll proceed without the template if it doesn't load
+      // In production, you'd preload this image
+      console.log('Template background mode - ensure prescription-template.png exists in public folder');
+    } catch (err) {
+      console.warn('Template background not loaded, using default header');
+    }
+  }
 
-  // Phone numbers
-  doc.setTextColor(80, 80, 80);
-  doc.text("Tel: 0100 100 6013 / 0122 326 1827", pageWidth / 2, 40, { align: 'center' });
+  // ========== HEADER (skip if using template) ==========
+  if (!useTemplateBackground) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0);
+    doc.text(doctorName, pageWidth / 2, y, { align: 'center' });
+    y += 6;
 
-  // Decorative line under header
-  doc.setDrawColor(0, 100, 100);
-  doc.setLineWidth(0.5);
-  doc.line(margin, 45, pageWidth - margin, 45);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text("M.B.B.Ch, M.Sc. Psychiatry", pageWidth / 2, y, { align: 'center' });
+    y += 5;
+
+    doc.setFontSize(9);
+    doc.text("250 Teraa Elbolakya St., Shoubra, Cairo", pageWidth / 2, y, { align: 'center' });
+    y += 4;
+
+    doc.setTextColor(80, 80, 80);
+    doc.text("Tel: 0100 100 6013 / 0122 326 1827", pageWidth / 2, y, { align: 'center' });
+    y += 6;
+
+    // Header line
+    doc.setDrawColor(0, 100, 100);
+    doc.setLineWidth(0.4);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 10;
+  } else {
+    // When using template, start writing in the prescription area
+    // Adjust this value based on your template's header height
+    y = 65; // Skip past the template header area
+  }
 
   // ========== PATIENT INFO ==========
   doc.setTextColor(0, 0, 0);
-  doc.setFontSize(11);
+  doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
 
-  // Date - right aligned
   const today = new Date();
-  const dateStr = today.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  });
-  doc.text(`Date: ${dateStr}`, pageWidth - margin, 55, { align: 'right' });
+  const dateStr = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+  doc.text(`Date: ${dateStr}`, pageWidth - margin, y, { align: 'right' });
+  doc.text(`Patient: ${patient.full_name}`, margin, y);
+  y += 6;
 
-  // Patient Name
-  doc.setFont('helvetica', 'bold');
-  doc.text("Patient Name:", margin, 55);
-  doc.setFont('helvetica', 'normal');
-  doc.text(patient.full_name, margin + 35, 55);
-
-  // Patient Code and Age
-  doc.text(`Code: ${patient.patient_code}`, margin, 63);
-  doc.text(`Age: ${patient.age || 'N/A'} years`, margin + 50, 63);
+  doc.text(`Code: ${patient.patient_code}  |  Age: ${patient.age || 'N/A'} yrs`, margin, y);
+  y += 8;
 
   // ========== DIAGNOSIS ==========
   if (diagnosis) {
     doc.setFont('helvetica', 'bold');
-    doc.text("Diagnosis:", margin, 73);
+    doc.text("Diagnosis:", margin, y);
     doc.setFont('helvetica', 'normal');
-    const diagnosisText = diagnosis.substring(0, 60); // Limit length
-    doc.text(diagnosisText, margin + 28, 73);
+
+    // Capitalize diagnosis and add severity
+    let diagDisplay = diagnosis.charAt(0).toUpperCase() + diagnosis.slice(1);
+    if (severity) {
+      const sevMap: Record<string, string> = { 'mild': 'Mild', 'moderate': 'Moderate', 'severe': 'Severe' };
+      diagDisplay += ` (${sevMap[severity] || severity})`;
+    }
+    doc.text(diagDisplay.substring(0, 55), margin + 25, y);
+    y += 8;
   }
 
   // Line before Rx
   doc.setDrawColor(150, 150, 150);
   doc.setLineWidth(0.2);
-  doc.line(margin, 80, pageWidth - margin, 80);
+  doc.line(margin, y, pageWidth - margin, y);
+  y += 8;
 
   // ========== Rx PRESCRIPTION AREA ==========
-  // Rx symbol
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(0, 0, 0);
-  doc.text("R/", margin, 92);
+  doc.text("℞", margin, y);
+  y += 10;
 
-  // Prescription items with ruled lines
+  // Prescription items
   doc.setFontSize(11);
-  doc.setFont('helvetica', 'normal');
-
-  let currentY = 100;
-  const lineHeight = 18;
-  const leftCol = margin + 5;
 
   drugs.forEach((drug, index) => {
-    // Drug number and name
+    if (y > pageHeight - 50) {
+      doc.addPage();
+      y = 20;
+    }
+
+    // Drug number and name in English (left side)
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(0, 80, 80);
-    doc.text(`${index + 1}.`, leftCol, currentY);
-    doc.text(drug.trade_name, leftCol + 8, currentY);
+    doc.text(`${index + 1}. ${drug.trade_name} ${drug.dose}`, margin + 5, y);
 
-    // Generic name in parentheses
+    // Generic name (smaller)
     doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
     doc.setTextColor(100, 100, 100);
-    doc.setFontSize(9);
-    doc.text(`(${drug.generic_name})`, leftCol + 8 + doc.getTextWidth(drug.trade_name) + 3, currentY);
+    const nameWidth = doc.getTextWidth(`${index + 1}. ${drug.trade_name} ${drug.dose}`);
+    doc.text(`(${drug.generic_name})`, margin + 8 + nameWidth, y);
+    doc.setFontSize(11);
+    y += 5;
 
-    // Dosage instruction line
-    doc.setFontSize(10);
+    // Arabic instruction (right side, RTL appearance)
     doc.setTextColor(0, 0, 0);
-    const instruction = `${drug.dose} - ${formatFrequency(drug.frequency)} - ${drug.duration}`;
-    doc.text(instruction, leftCol + 12, currentY + 7);
+    const arabicFreq = frequencyArabic[drug.frequency.toUpperCase()] || drug.frequency;
+    const arabicDur = getArabicDuration(drug.duration);
+    const instruction = `قرص ${arabicFreq} لمدة ${arabicDur}`;
+
+    doc.text(instruction, pageWidth - margin - 5, y, { align: 'right' });
+    y += 3;
 
     // Ruled line under each drug
     doc.setDrawColor(200, 200, 200);
     doc.setLineWidth(0.1);
-    doc.line(leftCol, currentY + 12, pageWidth - margin, currentY + 12);
-
-    currentY += lineHeight;
-
-    // Check for page overflow
-    if (currentY > 250) {
-      doc.addPage();
-      currentY = 30;
-    }
+    doc.line(margin + 5, y, pageWidth - margin, y);
+    y += 10;
   });
 
-  // Empty ruled lines for writing
-  const emptyLines = Math.max(3, 8 - drugs.length);
-  for (let i = 0; i < emptyLines; i++) {
-    doc.setDrawColor(220, 220, 220);
-    doc.line(leftCol, currentY, pageWidth - margin, currentY);
-    currentY += 8;
+  // Empty ruled lines for writing (only if not using template)
+  if (!useTemplateBackground) {
+    for (let i = 0; i < 4; i++) {
+      if (y > pageHeight - 40) break;
+      doc.setDrawColor(220, 220, 220);
+      doc.line(margin + 5, y, pageWidth - margin, y);
+      y += 7;
+    }
   }
 
-  // ========== SIGNATURE AREA ==========
-  // Signature line at bottom right
-  const sigY = 270;
-  doc.setDrawColor(0, 0, 0);
-  doc.setLineWidth(0.3);
-  doc.line(pageWidth - 70, sigY, pageWidth - margin, sigY);
-  doc.setFontSize(9);
-  doc.setTextColor(100, 100, 100);
-  doc.text("Signature", pageWidth - margin - 25, sigY + 5);
+  // ========== SIGNATURE (skip if using template) ==========
+  if (!useTemplateBackground) {
+    const sigY = pageHeight - 25;
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.3);
+    doc.line(pageWidth - 70, sigY, pageWidth - margin, sigY);
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
+    doc.text("Signature", pageWidth - margin - 20, sigY + 4);
 
-  // Footer
-  doc.setFontSize(8);
-  doc.setTextColor(150, 150, 150);
-  doc.text("Generated by Clinic-OS", pageWidth / 2, 287, { align: 'center' });
+    // Footer
+    doc.setFontSize(7);
+    doc.text("Generated by Clinic-OS", pageWidth / 2, pageHeight - 8, { align: 'center' });
+  }
 
-  // Save PDF
-  const fileName = `Rx_${patient.patient_code}_${today.getTime()}.pdf`;
+  // ========== OUTPUT - Open print dialog ==========
+  const fileName = `Rx_${patient.patient_code}_${Date.now()}.pdf`;
+
+  // Create blob and open in new tab with print
+  const pdfBlob = doc.output('blob');
+  const blobUrl = URL.createObjectURL(pdfBlob);
+
+  // Open in new window and trigger print
+  const printWindow = window.open(blobUrl, '_blank');
+  if (printWindow) {
+    printWindow.addEventListener('load', () => {
+      printWindow.print();
+    });
+  }
+
+  // Also save the file
   doc.save(fileName);
+
+  // Cleanup
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
 
   return fileName;
 };
 
 /**
- * Format frequency with readable text
+ * Synchronous version for backward compatibility
  */
-const formatFrequency = (frequency: string): string => {
-  const frequencyMap: Record<string, string> = {
-    'OD': 'Once daily',
-    'BID': 'Twice daily',
-    'TID': '3x daily',
-    'QID': '4x daily',
-    'QHS': 'At bedtime',
-    'QOD': 'Every other day',
-    'PRN': 'As needed',
-    'AC': 'Before meals',
-    'PC': 'After meals',
-    'STAT': 'Immediately',
-  };
-
-  return frequencyMap[frequency.toUpperCase()] || frequency;
+export const generateRxPDFSync = (
+  patient: PatientRow,
+  drugs: RxDrug[],
+  doctorName: string = "Dr. Amgad Khairy Kamel",
+  diagnosis: string = "",
+  severity?: 'mild' | 'moderate' | 'severe'
+) => {
+  // Call async version without waiting
+  generateRxPDF(patient, drugs, doctorName, diagnosis, severity, false);
 };

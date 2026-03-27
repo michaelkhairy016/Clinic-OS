@@ -210,23 +210,22 @@ export default function ClinicalPage() {
   const handleSaveVisit = async () => {
     if (!activePatient || !activeQueueEntryId) return;
 
-    // Validate clinical notes
-    const validation = validateClinicalNotes({ diagnosis, clinicalNotes: notes });
-    if (!validation.isValid) {
-      setErrors(validation.errors);
-      alert(formatValidationErrors(validation.errors));
+    // Only validate diagnosis is present - notes are optional
+    if (!diagnosis) {
+      setErrors({ diagnosis: 'Diagnosis is required' });
+      alert('Please select a diagnosis\n\nالرجاء اختيار التشخيص');
       return;
     }
 
     setSaving(true);
     try {
-      // Create clinical note
+      // Create clinical note (notes are optional)
       const { data: clinicalNote, error: noteError } = await supabase
         .from('clinical_notes')
         .insert({
           queue_entry_id: activeQueueEntryId,
           diagnosis,
-          clinical_notes: notes,
+          clinical_notes: notes || '',
           visit_type: visitType
         })
         .select()
@@ -277,11 +276,18 @@ export default function ClinicalPage() {
     }
   };
 
-  const handlePrintRx = () => {
+  const handlePrintRx = async () => {
     if (!activePatient) return alert('الرجاء اختيار مريض أولاً\n\nPlease select a patient first');
     if (prescription.length === 0) return alert('الرجاء إضافة أدوية للروشتة\n\nPlease add medications to the prescription');
     const docName = user?.user_metadata?.full_name || "Dr. Amgad Khairy Kamel";
-    generateRxPDF(activePatient, prescription, docName, diagnosis);
+
+    // Get diagnosis text with severity
+    const fullDiagnosis = (selectedDiagnosisCategory === 'depression' || selectedDiagnosisCategory === 'anxiety') && severity
+      ? `${diagnosis} (${severity})`
+      : diagnosis;
+
+    // Generate PDF and open print dialog
+    await generateRxPDF(activePatient, prescription, docName, fullDiagnosis, severity || undefined);
   };
 
   const handleSelectAnotherPatient = () => {
