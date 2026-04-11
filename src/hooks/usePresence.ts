@@ -33,7 +33,7 @@ export function usePresence() {
   const updatePresence = useCallback(async () => {
     if (!user || !activeClinicId) return;
 
-    const userName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Unknown';
+    const userName = user.full_name || user.email.split('@')[0] || 'Unknown';
 
     await supabase
       .from('user_presence')

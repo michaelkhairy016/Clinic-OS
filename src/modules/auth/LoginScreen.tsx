@@ -121,7 +121,7 @@ export const LoginScreen = () => {
             New assistant or marketer? Request access
           </Link>
           <span style={{ color: 'var(--text-light)', display: 'block', marginTop: '0.75rem', fontSize: '0.85rem' }}>
-            Doctor accounts are created by the clinic (Supabase Dashboard); staff sign up here and wait for approval.
+            Doctor accounts are created by the administrator. Staff sign up here and wait for approval.
           </span>
         </div>
       </div>

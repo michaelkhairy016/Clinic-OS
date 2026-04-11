@@ -2,32 +2,38 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/modules/auth/AuthContext';
-import type { ApprovalStatus, ProfileRow, UserRole } from '@/types/database';
 import { UserCheck } from 'lucide-react';
 
-type ProfileListRow = Pick<ProfileRow, 'id' | 'email' | 'role' | 'approval_status' | 'full_name'>;
+type PendingAdmin = {
+  id: string;
+  email: string;
+  full_name: string | null;
+  role: string;
+  approval_status: string;
+  created_at: string;
+};
 
 export default function ApprovalsPage() {
   const router = useRouter();
   const { role, approvalStatus, loading: authLoading } = useAuth();
-  const [rows, setRows] = useState<ProfileListRow[]>([]);
+  const [rows, setRows] = useState<PendingAdmin[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
-    const supabase = createClient();
-    const { data, error: e } = await supabase
-      .from('profiles')
-      .select('id, email, role, approval_status, full_name')
-      .eq('approval_status', 'pending')
-      .order('email', { ascending: true });
-    if (e) setError(e.message);
-    setRows((data as ProfileListRow[]) ?? []);
-    setLoading(false);
+    try {
+      const res = await fetch('/api/auth/approvals');
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Failed to load'); return; }
+      setRows(data.admins ?? []);
+    } catch {
+      setError('Network error');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -44,30 +50,26 @@ export default function ApprovalsPage() {
 
   const approve = async (id: string) => {
     setBusyId(id);
-    const supabase = createClient();
-    const { error: e } = await supabase.from('profiles').update({ approval_status: 'approved' as ApprovalStatus }).eq('id', id);
-    setBusyId(null);
-    if (e) {
-      alert(e.message);
-      return;
+    try {
+      const res = await fetch('/api/auth/approvals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, approval_status: 'approved' }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || 'Failed to approve'); return; }
+      await load();
+    } finally {
+      setBusyId(null);
     }
-    await load();
   };
 
   if (authLoading || role !== 'doctor' || approvalStatus !== 'approved') {
-    return (
-      <div className="card">
-        <p style={{ margin: 0, color: 'var(--text-medium)' }}>Loading…</p>
-      </div>
-    );
+    return <div className="card"><p style={{ margin: 0, color: 'var(--text-medium)' }}>Loading…</p></div>;
   }
 
   if (loading) {
-    return (
-      <div className="card">
-        <p style={{ margin: 0, color: 'var(--text-medium)' }}>Loading pending accounts…</p>
-      </div>
-    );
+    return <div className="card"><p style={{ margin: 0, color: 'var(--text-medium)' }}>Loading pending accounts…</p></div>;
   }
 
   return (
@@ -79,7 +81,7 @@ export default function ApprovalsPage() {
         </h2>
       </div>
       <p style={{ color: 'var(--text-medium)', marginBottom: '1.5rem' }}>
-        Approve new assistants and marketers after you verify them. They cannot access patient data until approved.
+        Approve new assistants and marketers after you verify them. They cannot access the system until approved.
       </p>
 
       {error && (
@@ -96,6 +98,7 @@ export default function ApprovalsPage() {
             <table style={{ textAlign: 'left', width: '100%' }}>
               <thead>
                 <tr>
+                  <th>Name</th>
                   <th>Email</th>
                   <th>Requested role</th>
                   <th style={{ width: 140 }}>Action</th>
@@ -104,8 +107,9 @@ export default function ApprovalsPage() {
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id}>
-                    <td>{r.email ?? '—'}</td>
-                    <td style={{ textTransform: 'capitalize' }}>{r.role as UserRole}</td>
+                    <td>{r.full_name || '—'}</td>
+                    <td>{r.email}</td>
+                    <td style={{ textTransform: 'capitalize' }}>{r.role}</td>
                     <td>
                       <button
                         type="button"

@@ -1,14 +1,20 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { User } from '@supabase/supabase-js';
-import { createClient, isSupabaseConfigured, clearAllSupabaseData } from '@/lib/supabase/client';
 import type { ApprovalStatus, UserRole } from '@/types/database';
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  full_name: string | null;
+  role: UserRole;
+  approval_status: ApprovalStatus;
+}
 
 type Role = UserRole | null;
 
 interface AuthState {
-  user: User | null;
+  user: AdminUser | null;
   role: Role;
   approvalStatus: ApprovalStatus | null;
   login: (
@@ -18,9 +24,10 @@ interface AuthState {
   signup: (
     email: string,
     password: string,
+    fullName: string,
     requestedRole: 'assistant' | 'marketing'
-  ) => Promise<{ error?: string; needsEmailConfirm?: boolean }>;
-  logout: () => Promise<void>;
+  ) => Promise<{ error?: string }>;
+  logout: () => void;
   loading: boolean;
   language: 'en' | 'ar';
   activeClinicId: string | null;
@@ -29,169 +36,48 @@ interface AuthState {
   retryInit: () => void;
 }
 
+const STORAGE_KEY = 'clinic_os_admin';
+
+function readSessionFromStorage(): AdminUser | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as AdminUser;
+  } catch {
+    return null;
+  }
+}
+
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<Role>(null);
-  const [approvalStatus, setApprovalStatus] = useState<ApprovalStatus | null>(null);
+  const [user, setUser] = useState<AdminUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [language, setLanguage] = useState<'en' | 'ar'>('ar');
   const [activeClinicId, setActiveClinicIdState] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
+  const [error] = useState<string | null>(null);
 
-  // Initialize activeClinicId from sessionStorage (session-only, cleared on tab close)
+  // Derived from user — no separate state needed
+  const role: Role = user?.role ?? null;
+  const approvalStatus: ApprovalStatus | null = user?.approval_status ?? null;
+
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const saved = sessionStorage.getItem('clinic_os_active_clinic');
-      if (saved) setActiveClinicIdState(saved);
-    }
+    const saved = sessionStorage.getItem('clinic_os_active_clinic');
+    if (saved) setActiveClinicIdState(saved);
   }, []);
 
   const setActiveClinicId = (id: string | null) => {
     setActiveClinicIdState(id);
-    if (typeof window !== 'undefined') {
-      if (id) sessionStorage.setItem('clinic_os_active_clinic', id);
-      else sessionStorage.removeItem('clinic_os_active_clinic');
-    }
+    if (id) sessionStorage.setItem('clinic_os_active_clinic', id);
+    else sessionStorage.removeItem('clinic_os_active_clinic');
   };
 
-  // Fetch profile with retry logic
-  const fetchProfileWithRetry = useCallback(async (userId: string): Promise<{ role: string | null; approval_status: string | null } | null> => {
-    const supabase = createClient();
-    let retries = 3;
-    let lastError = null;
-
-    while (retries > 0) {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('role, approval_status')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (error) {
-        lastError = error;
-        retries--;
-        if (retries > 0) {
-          await new Promise(r => setTimeout(r, 1000));
-        }
-      } else {
-        return data;
-      }
-    }
-
-    console.error('Profile fetch failed after retries:', lastError);
-    return null;
-  }, []);
-
+  // Initialize from localStorage — synchronous, instant, no async init
   useEffect(() => {
-    if (!isSupabaseConfigured()) {
-      setLoading(false);
-      return;
-    }
-
-    const supabase = createClient();
-    let cancelled = false;
-    let initCompleted = false;
-
-    // Shorter timeout (5 seconds) with auto-clear
-    const timeoutId = setTimeout(() => {
-      if (!cancelled && !initCompleted) {
-        console.warn('Auth initialization timed out - clearing all data');
-        // Auto-clear storage on timeout
-        clearAllSupabaseData();
-        setError('Connection timeout. Please refresh or clear cookies.');
-        setLoading(false);
-      }
-    }, 5000);
-
-    const init = async () => {
-      try {
-        setError(null);
-
-        const {
-          data: { user: u },
-          error: userError,
-        } = await supabase.auth.getUser();
-
-        // If there's an auth error, clear cookies and reset
-        if (userError) {
-          console.warn('Auth error, clearing session:', userError.message);
-          clearAllSupabaseData();
-          if (!cancelled) {
-            setUser(null);
-            setRole(null);
-            setApprovalStatus(null);
-          }
-          return;
-        }
-
-        if (cancelled) return;
-
-        if (u) {
-          setUser(u);
-          const profileData = await fetchProfileWithRetry(u.id);
-
-          if (cancelled) return;
-
-          if (profileData) {
-            setRole((profileData.role as UserRole) ?? null);
-            const raw = profileData.approval_status as string | undefined;
-            setApprovalStatus(raw === 'pending' ? 'pending' : 'approved');
-          } else {
-            setRole(null);
-            setApprovalStatus(null);
-          }
-        }
-      } catch (err) {
-        console.error('Auth initialization failed:', err);
-        if (!cancelled) {
-          // Clear storage on error
-          clearAllSupabaseData();
-          setError('Authentication error. Please refresh the page.');
-        }
-      } finally {
-        initCompleted = true;
-        clearTimeout(timeoutId);
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    void init();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Only handle specific events
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        if (session?.user) {
-          setUser(session.user);
-          const profileData = await fetchProfileWithRetry(session.user.id);
-          if (profileData) {
-            setRole((profileData.role as UserRole) ?? null);
-            const raw = profileData.approval_status as string | undefined;
-            setApprovalStatus(raw === 'pending' ? 'pending' : 'approved');
-          }
-        }
-      } else if (event === 'SIGNED_OUT') {
-        setUser(null);
-        setRole(null);
-        setApprovalStatus(null);
-        setActiveClinicIdState(null);
-        setError(null);
-        // Clear session storage on sign out
-        if (typeof window !== 'undefined') {
-          sessionStorage.removeItem('clinic_os_active_clinic');
-        }
-      }
-    });
-
-    return () => {
-      cancelled = true;
-      subscription.unsubscribe();
-    };
-  }, [retryCount, fetchProfileWithRetry]);
+    const stored = readSessionFromStorage();
+    setUser(stored);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
     if (role === 'doctor') {
@@ -206,102 +92,53 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [role]);
 
   const login = async (email: string, password: string) => {
-    if (!isSupabaseConfigured()) {
-      return { error: 'Supabase is not configured' };
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { error: data.error || 'Login failed' };
+      const admin = data.admin as AdminUser;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(admin));
+      setUser(admin);
+      return { role: admin.role, approvalStatus: admin.approval_status };
+    } catch {
+      return { error: 'Network error. Please try again.' };
     }
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { error: error.message };
-    const {
-      data: { user: u },
-    } = await supabase.auth.getUser();
-    if (!u) return { error: 'No user returned' };
-    const { data } = await supabase.from('profiles').select('role, approval_status').eq('id', u.id).maybeSingle();
-    if (!data) {
-      setUser(u);
-      setRole(null);
-      setApprovalStatus(null);
-      return { error: 'No profile row for this user' };
-    }
-    const r = (data.role as UserRole) ?? null;
-    setUser(u);
-    setRole(r);
-    const ap = data.approval_status as string | undefined;
-    const approval: ApprovalStatus = ap === 'pending' ? 'pending' : 'approved';
-    setApprovalStatus(approval);
-    return { role: r, approvalStatus: approval };
   };
 
-  const signup = async (email: string, password: string, requestedRole: 'assistant' | 'marketing') => {
-    if (!isSupabaseConfigured()) {
-      return { error: 'Supabase is not configured' };
+  const signup = async (
+    email: string,
+    password: string,
+    fullName: string,
+    requestedRole: 'assistant' | 'marketing'
+  ) => {
+    try {
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, full_name: fullName, role: requestedRole }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { error: data.error || 'Signup failed' };
+      return {};
+    } catch {
+      return { error: 'Network error. Please try again.' };
     }
-    const supabase = createClient();
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      options: {
-        data: {
-          signup_source: 'clinic_staff',
-          requested_role: requestedRole,
-        },
-      },
-    });
-    if (error) return { error: error.message };
-    const needsEmailConfirm = !data.session;
-    return { needsEmailConfirm };
   };
 
-  const logout = async () => {
-    // Clear local state immediately
+  const logout = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem('clinic_os_active_clinic');
     setUser(null);
-    setRole(null);
-    setApprovalStatus(null);
-    setError(null);
     setActiveClinicIdState(null);
-    setLoading(true); // Prevent flash of content
-
-    if (typeof window !== 'undefined') {
-      try {
-        // 1. Call server-side logout first (wait for it)
-        await fetch('/auth/logout', { method: 'POST' });
-
-        // 2. Try client-side signout
-        if (isSupabaseConfigured()) {
-          const supabase = createClient();
-          await supabase.auth.signOut().catch(() => {});
-        }
-
-        // 3. Clear ALL storage (localStorage, sessionStorage, IndexedDB, cookies)
-        await clearAllSupabaseData();
-
-        // 4. Clear service workers
-        if ('serviceWorker' in navigator) {
-          const registrations = await navigator.serviceWorker.getRegistrations();
-          await Promise.all(registrations.map(reg => reg.unregister()));
-        }
-
-        // 5. Clear caches
-        if ('caches' in window) {
-          const names = await caches.keys();
-          await Promise.all(names.map(name => caches.delete(name)));
-        }
-
-        // 6. Full page reload to clear any in-memory state
-        window.location.href = '/';
-      } catch (error) {
-        console.error('Logout error:', error);
-        // Even on error, clear everything and redirect
-        await clearAllSupabaseData();
-        window.location.href = '/';
-      }
-    }
   };
 
   const retryInit = useCallback(() => {
-    setError(null);
-    setLoading(true);
-    setRetryCount(c => c + 1);
+    const stored = readSessionFromStorage();
+    setUser(stored);
   }, []);
 
   return (
@@ -309,7 +146,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       value={{
         user, role, approvalStatus, login, signup, logout,
         loading, language, activeClinicId, setActiveClinicId,
-        error, retryInit
+        error, retryInit,
       }}
     >
       {children}
@@ -318,7 +155,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 };
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within AuthProvider');
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
 };

@@ -3,43 +3,33 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/modules/auth/AuthContext';
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
 import { UserPlus } from 'lucide-react';
 
 export default function StaffSignupPage() {
   const { signup } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const [requestedRole, setRequestedRole] = useState<'assistant' | 'marketing'>('assistant');
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
-  const [needsConfirm, setNeedsConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!isSupabaseConfigured()) {
-      setError('Supabase is not configured');
-      return;
-    }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (password.length < 4) {
+      setError('Password must be at least 4 characters');
       return;
     }
     setBusy(true);
     try {
-      const result = await signup(email.trim(), password, requestedRole);
+      const result = await signup(email.trim(), password, fullName.trim(), requestedRole);
       if (result.error) {
         setError(result.error);
         return;
       }
-      setNeedsConfirm(Boolean(result.needsEmailConfirm));
       setDone(true);
-      if (!result.needsEmailConfirm) {
-        const supabase = createClient();
-        await supabase.auth.signOut();
-      }
     } finally {
       setBusy(false);
     }
@@ -60,19 +50,11 @@ export default function StaffSignupPage() {
       >
         <div className="card" style={{ maxWidth: 480, textAlign: 'center' }}>
           <h2 style={{ color: 'var(--primary)', marginTop: 0 }}>تم إرسال الطلب</h2>
-          {needsConfirm ? (
-            <p style={{ color: 'var(--text-medium)', lineHeight: 1.7 }}>
-              راجع بريدك الإلكتروني واضغط رابط التأكيد، ثم انتظر موافقة الطبيب قبل تسجيل الدخول.
-            </p>
-          ) : (
-            <p style={{ color: 'var(--text-medium)', lineHeight: 1.7 }}>
-              تم إنشاء الحساب. انتظر موافقة الطبيب ثم سجّل الدخول من صفحة تسجيل الدخول.
-            </p>
-          )}
+          <p style={{ color: 'var(--text-medium)', lineHeight: 1.7 }}>
+            تم إنشاء الحساب. انتظر موافقة الطبيب ثم سجّل الدخول من صفحة تسجيل الدخول.
+          </p>
           <p style={{ color: 'var(--text-light)', fontSize: '0.9rem' }}>
-            {needsConfirm
-              ? 'Check your email to confirm, then wait for the doctor to approve your access.'
-              : 'Wait for the doctor to approve your account, then sign in.'}
+            Wait for the doctor to approve your account, then sign in.
           </p>
           <Link href="/" className="btn btn-primary" style={{ display: 'inline-block', marginTop: '1.5rem' }}>
             إلى تسجيل الدخول
@@ -144,6 +126,19 @@ export default function StaffSignupPage() {
           </div>
 
           <div>
+            <label style={{ display: 'block', marginBottom: 6, fontWeight: 700 }}>الاسم الكامل</label>
+            <input
+              type="text"
+              required
+              autoComplete="name"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="مثال: أحمد محمد"
+              style={{ width: '100%', padding: '12px', borderRadius: 8, border: '1px solid var(--border)', fontSize: '1rem' }}
+            />
+          </div>
+
+          <div>
             <label style={{ display: 'block', marginBottom: 6, fontWeight: 700 }}>البريد الإلكتروني</label>
             <input
               type="email"
@@ -161,7 +156,7 @@ export default function StaffSignupPage() {
               type="password"
               required
               autoComplete="new-password"
-              minLength={6}
+              minLength={4}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               style={{ width: '100%', padding: '12px', borderRadius: 8, border: '1px solid var(--border)', fontSize: '1rem' }}

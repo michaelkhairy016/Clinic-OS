@@ -279,7 +279,7 @@ export default function ClinicalPage() {
   const handlePrintRx = async () => {
     if (!activePatient) return alert('الرجاء اختيار مريض أولاً\n\nPlease select a patient first');
     if (prescription.length === 0) return alert('الرجاء إضافة أدوية للروشتة\n\nPlease add medications to the prescription');
-    const docName = user?.user_metadata?.full_name || "Dr. Amgad Khairy Kamel";
+    const docName = user?.full_name || "Dr. Amgad Khairy Kamel";
 
     // Get diagnosis text with severity
     const fullDiagnosis = (selectedDiagnosisCategory === 'depression' || selectedDiagnosisCategory === 'anxiety') && severity

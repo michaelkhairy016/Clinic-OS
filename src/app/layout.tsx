@@ -33,26 +33,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ar">
+    <html lang="ar" suppressHydrationWarning>
       <head>
         <link rel="apple-touch-icon" href="/icon-192x192.png" />
         <link rel="icon" href="/icon-192x192.png" />
       </head>
-      <body className={inter.className}>
+      <body className={inter.className} suppressHydrationWarning>
         <ClientLayout>{children}</ClientLayout>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', () => {
-                  navigator.serviceWorker.register('/sw.js')
-                    .then(registration => console.log('SW registered: ', registration))
-                    .catch(registrationError => console.log('SW registration failed: ', registrationError));
-                });
-              }
-            `
-          }}
-        />
       </body>
     </html>
   );
